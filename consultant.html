@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Taiwo Adeyemi — Pathora</title>
+  <meta name="description" content="Senior PM at Google with 8 years experience. Book a free 45-minute career session with Taiwo Adeyemi on Pathora.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,700;0,900;1,300;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ── Breadcrumb ── */
+    .breadcrumb {
+      padding: 16px 0; border-bottom: 1px solid var(--border);
+      background: var(--white);
+    }
+    .breadcrumb-inner { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .breadcrumb-inner a { color: var(--muted); transition: color 160ms; }
+    .breadcrumb-inner a:hover { color: var(--navy); }
+    .breadcrumb-inner svg { color: var(--light); }
+    .breadcrumb-inner span { color: var(--text); font-weight: 500; }
+
+    /* ── Profile layout ── */
+    .profile-section { padding: 48px 0 80px; }
+    .profile-grid { display: grid; grid-template-columns: 1fr 360px; gap: 48px; align-items: start; }
+
+    /* ── Left column ── */
+    .profile-left {}
+    .profile-hero { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 28px; }
+    .profile-hero-info { flex: 1; }
+    .profile-name { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 700; color: var(--navy); letter-spacing: -1px; margin-bottom: 6px; }
+    .profile-role { font-size: 16px; color: var(--muted); margin-bottom: 12px; }
+    .profile-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .vetted-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: var(--r-pill);
+      background: var(--navy); color: var(--white);
+      font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    }
+    .vetted-badge svg { color: var(--amber); }
+
+    /* Stats row */
+    .profile-stats { display: flex; gap: 32px; padding: 24px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 32px; flex-wrap: wrap; }
+    .stat-item { display: flex; flex-direction: column; gap: 3px; }
+    .stat-item-num { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; color: var(--navy); }
+    .stat-item-label { font-size: 12px; color: var(--muted); }
+
+    /* Sections */
+    .profile-section-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+    .profile-block { margin-bottom: 36px; }
+    .profile-block p { font-size: 15px; color: var(--text); line-height: 1.75; }
+
+    /* Help list */
+    .help-list { display: flex; flex-direction: column; gap: 10px; }
+    .help-item { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); line-height: 1.6; }
+    .help-item::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); margin-top: 7px; flex-shrink: 0; }
+
+    /* Tags row */
+    .tags-row { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    /* Timeline */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-item { display: flex; gap: 16px; padding-bottom: 24px; position: relative; }
+    .timeline-item:not(:last-child)::before { content: ''; position: absolute; left: 19px; top: 40px; bottom: 0; width: 1px; background: var(--border); }
+    .timeline-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--warm-gray); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 12px; font-weight: 700; font-family: 'Fraunces', serif; color: var(--navy); }
+    .timeline-dot.current { background: var(--amber-light); border-color: var(--amber); color: var(--amber-dark); }
+    .timeline-info h4 { font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 2px; }
+    .timeline-info p { font-size: 13px; color: var(--muted); }
+    .timeline-info .timeline-date { font-size: 12px; color: var(--light); margin-top: 2px; }
+
+    /* ── Right column (booking widget) ── */
+    .booking-widget {
+      position: sticky; top: 80px;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r-modal); padding: 28px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+    }
+    .booking-widget-header { margin-bottom: 20px; }
+    .session-type { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .session-meta { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .session-free-badge { display: inline-block; padding: 2px 8px; background: var(--green-light); color: var(--green); border-radius: var(--r-pill); font-size: 11px; font-weight: 600; }
+
+    /* Calendar placeholder */
+    .calendar-placeholder {
+      background: var(--warm-gray); border-radius: 12px; padding: 20px;
+      margin: 16px 0; min-height: 160px;
+    }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .cal-header span { font-size: 14px; font-weight: 600; color: var(--navy); }
+    .cal-nav { display: flex; gap: 8px; }
+    .cal-nav button { width: 28px; height: 28px; border-radius: 50%; background: var(--white); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--muted); transition: all 160ms; }
+    .cal-nav button:hover { border-color: var(--amber); color: var(--amber-dark); }
+    .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+    .cal-day-label { font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--light); padding: 4px 0; }
+    .cal-day { font-size: 13px; padding: 6px 4px; border-radius: 6px; cursor: pointer; transition: all 160ms; color: var(--muted); }
+    .cal-day:hover { background: var(--amber-light); color: var(--amber-dark); }
+    .cal-day.available { color: var(--navy); font-weight: 500; }
+    .cal-day.selected { background: var(--amber); color: var(--white); font-weight: 600; }
+    .cal-day.past { color: var(--light); pointer-events: none; }
+    .cal-day.empty { pointer-events: none; }
+
+    .booking-footer { margin-top: 12px; }
+    .booking-info { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .booking-info-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .booking-info-item svg { color: var(--light); flex-shrink: 0; }
+
+    /* Mobile sticky CTA */
+    .mobile-book-bar {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+      background: var(--white); border-top: 1px solid var(--border);
+      padding: 12px 20px; gap: 12px; align-items: center;
+    }
+    .mobile-book-bar-info { flex: 1; }
+    .mobile-book-bar-info strong { display: block; font-size: 14px; font-weight: 600; color: var(--navy); }
+    .mobile-book-bar-info span { font-size: 12px; color: var(--muted); }
+
+    /* ── Related consultants ── */
+    .related-section { padding: 48px 0 80px; background: var(--warm-gray); }
+    .related-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 32px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 960px) {
+      .profile-grid { grid-template-columns: 1fr; }
+      .booking-widget { position: static; }
+      .mobile-book-bar { display: flex; }
+      body { padding-bottom: 80px; }
+      .related-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .profile-stats { gap: 20px; }
+      .related-grid { grid-template-columns: 1fr; }
+      .profile-name { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip">Skip to main content</a>
+
+  <!-- Navbar -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="index.html" class="nav-logo" aria-label="Pathora home">Path<span class="accent">ora</span></a>
+        <ul class="nav-links" role="list">
+          <li><a href="explore.html" class="active" aria-current="page">Find a Consultant</a></li>
+          <li><a href="discover.html">Discover Your Path</a></li>
+          <li><a href="dashboard.html#opportunities">Opportunities</a></li>
+        </ul>
+        <div class="nav-actions">
+          <a href="dashboard.html" class="btn btn-outline btn-sm">Sign In</a>
+          <a href="discover.html" class="btn btn-amber btn-sm">Discover My Path</a>
+        </div>
+        <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" role="dialog" aria-label="Navigation menu" aria-modal="true">
+    <div class="mob-header">
+      <a href="index.html" class="nav-logo">Path<span class="accent">ora</span></a>
+      <button class="mob-close" aria-label="Close menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <nav class="mob-links">
+      <a href="explore.html">Find a Consultant <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+      <a href="discover.html">Discover Your Path <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+    </nav>
+    <div class="mob-footer">
+      <a href="dashboard.html" class="btn btn-outline btn-full">Sign In</a>
+      <a href="discover.html" class="btn btn-amber btn-full">Discover My Path</a>
+    </div>
+  </div>
+
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <div class="container">
+      <div class="breadcrumb-inner">
+        <a href="explore.html" style="display:flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to Consultants
+        </a>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        <span>Taiwo Adeyemi</span>
+      </div>
+    </div>
+  </div>
+
+  <main id="main">
+    <section class="profile-section">
+      <div class="container">
+        <div class="profile-grid">
+
+          <!-- Left: Profile -->
+          <div class="profile-left">
+
+            <!-- Hero -->
+            <div class="profile-hero fade-up d0">
+              <div class="avatar av-amber av-80" aria-hidden="true">TA</div>
+              <div class="profile-hero-info">
+                <h1 class="profile-name">Taiwo Adeyemi</h1>
+                <p class="profile-role">Senior Product Manager · Google</p>
+                <div class="profile-badges">
+                  <span class="pill pill-amber">Technology</span>
+                  <div class="vetted-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Vetted &amp; Approved by Pathora
+                  </div>
+                  <div class="avail">Available this week</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="profile-stats fade-up d1" role="list" aria-label="Profile statistics">
+              <div class="stat-item" role="listitem">
+                <div class="stat-item-num">47</div>
+                <div class="stat-item-label">Sessions completed</div>
+              </div>
+              <div class="stat-item" role="listitem">
+                <div class="stat-item-num">4.9</div>
+                <div class="stat-item-label">Average rating</div>
+              </div>
+              <div class="stat-item" role="listitem">
+                <div class="stat-item-num">&lt;24hrs</div>
+                <div class="stat-item-label">Response time</div>
+              </div>
+              <div class="stat-item" role="listitem">
+                <div class="stat-item-num">8 yrs</div>
+                <div class="stat-item-label">Industry experience</div>
+              </div>
+            </div>
+
+            <!-- About -->
+            <div class="profile-block fade-up d2">
+              <h2 class="profile-section-title">About Taiwo</h2>
+              <p>Taiwo is a Senior Product Manager at Google, where he leads a cross-functional team building developer tools used by engineers across West Africa. Before Google, he spent four years at Flutterwave helping define the product strategy for their business payments suite.</p>
+              <p style="margin-top: 12px;">Originally from Lagos, Taiwo studied Computer Science at the University of Ibadan before moving into product management — a path he had to figure out largely on his own. He's now passionate about helping African students take that same journey with less friction and more clarity.</p>
+            </div>
+
+            <!-- Expertise tags -->
+            <div class="profile-block fade-up d2">
+              <h2 class="profile-section-title">Areas of expertise</h2>
+              <div class="tags-row">
+                <span class="tag" style="padding: 6px 12px; font-size: 13px;">Product Strategy</span>
+                <span class="tag" style="padding: 6px 12px; font-size: 13px;">Career Growth</span>
+                <span class="tag" style="padding: 6px 12px; font-size: 13px;">UX &amp; Design Thinking</span>
+                <span class="tag" style="padding: 6px 12px; font-size: 13px;">Tech Leadership</span>
+                <span class="tag" style="padding: 6px 12px; font-size: 13px;">Breaking into PM</span>
+                <span class="tag" style="padding: 6px 12px; font-size: 13px;">Internship Prep</span>
+              </div>
+            </div>
+
+            <!-- What I can help with -->
+            <div class="profile-block fade-up d2">
+              <h2 class="profile-section-title">What I can help with</h2>
+              <div class="help-list" role="list">
+                <div class="help-item" role="listitem">How to break into product management from a non-PM background</div>
+                <div class="help-item" role="listitem">Building your portfolio when you have no PM experience yet</div>
+                <div class="help-item" role="listitem">Navigating PM interviews at African startups and global tech companies</div>
+                <div class="help-item" role="listitem">Understanding the product landscape in Nigeria, Kenya, and beyond</div>
+                <div class="help-item" role="listitem">Career progression from associate PM to senior leadership</div>
+              </div>
+            </div>
+
+            <!-- Experience -->
+            <div class="profile-block fade-up d3">
+              <h2 class="profile-section-title">Experience</h2>
+              <div class="timeline">
+                <div class="timeline-item">
+                  <div class="timeline-dot current">G</div>
+                  <div class="timeline-info">
+                    <h4>Senior Product Manager</h4>
+                    <p>Google · Mountain View / Lagos</p>
+                    <div class="timeline-date">2021 – Present</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot">F</div>
+                  <div class="timeline-info">
+                    <h4>Product Manager, Business Payments</h4>
+                    <p>Flutterwave · Lagos</p>
+                    <div class="timeline-date">2017 – 2021</div>
+                  </div>
+                </div>
+                <div class="timeline-item">
+                  <div class="timeline-dot">I</div>
+                  <div class="timeline-info">
+                    <h4>Associate Product Manager</h4>
+                    <p>Interswitch · Lagos</p>
+                    <div class="timeline-date">2016 – 2017</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: Booking widget -->
+          <div>
+            <aside class="booking-widget fade-up d1" aria-label="Book a session">
+              <div class="booking-widget-header">
+                <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom: 6px;">
+                  <div class="session-type">Free 1:1 Session</div>
+                  <span class="session-free-badge">FREE</span>
+                </div>
+                <div class="session-meta">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  45 minutes · One-on-one
+                </div>
+              </div>
+
+              <!-- Calendar -->
+              <div class="calendar-placeholder" aria-label="Select a date">
+                <div class="cal-header">
+                  <span>June 2026</span>
+                  <div class="cal-nav">
+                    <button aria-label="Previous month">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <button aria-label="Next month">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="cal-days">
+                  <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div><div class="cal-day-label">Tu</div>
+                  <div class="cal-day-label">We</div><div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div><div class="cal-day-label">Sa</div>
+                  <div class="cal-day empty"></div><div class="cal-day past">1</div><div class="cal-day past">2</div>
+                  <div class="cal-day past">3</div><div class="cal-day past">4</div><div class="cal-day past">5</div><div class="cal-day past">6</div>
+                  <div class="cal-day past">7</div><div class="cal-day past">8</div><div class="cal-day past">9</div>
+                  <div class="cal-day past">10</div><div class="cal-day past">11</div><div class="cal-day past">12</div><div class="cal-day past">13</div>
+                  <div class="cal-day past">14</div><div class="cal-day past">15</div><div class="cal-day past">16</div>
+                  <div class="cal-day past">17</div><div class="cal-day past">18</div><div class="cal-day past">19</div><div class="cal-day past">20</div>
+                  <div class="cal-day past">21</div><div class="cal-day past">22</div><div class="cal-day past">23</div>
+                  <div class="cal-day past">24</div><div class="cal-day past">25</div><div class="cal-day past">26</div><div class="cal-day available" id="cal27">27</div>
+                  <div class="cal-day available">28</div><div class="cal-day available selected" id="cal29">29</div><div class="cal-day available">30</div>
+                </div>
+              </div>
+
+              <div class="booking-footer">
+                <button class="btn btn-amber btn-full btn-lg" onclick="handleBook()" style="font-size: 15px;">
+                  Book Session — June 29
+                </button>
+                <div class="booking-info">
+                  <div class="booking-info-item">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.893L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                    Sessions held via Google Meet or Zoom
+                  </div>
+                  <div class="booking-info-item">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Secure booking powered by Calendly
+                  </div>
+                  <div class="booking-info-item">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    No credit card required — completely free
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Related Consultants -->
+    <section class="related-section" aria-labelledby="related-heading">
+      <div class="container">
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom: 8px;">
+          <div>
+            <div class="section-label" aria-hidden="true">Technology sector</div>
+            <h2 id="related-heading" class="h3" style="color: var(--navy); margin-top: 4px;">More consultants in Technology</h2>
+          </div>
+          <a href="explore.html?sector=technology" class="btn btn-outline btn-sm">See all Technology →</a>
+        </div>
+        <div class="related-grid">
+
+          <!-- Chidi Eze -->
+          <article class="c-card">
+            <div class="c-card-header">
+              <div class="avatar av-green av-48" aria-hidden="true">CE</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Chidi Eze</div>
+                <div class="c-card-role">Software Engineer · Paystack</div>
+              </div>
+            </div>
+            <span class="pill pill-amber">Technology</span>
+            <div class="c-card-tags">
+              <span class="tag">Backend Engineering</span>
+              <span class="tag">System Design</span>
+              <span class="tag">Career Transition</span>
+            </div>
+            <div class="c-card-footer">
+              <div class="avail">Available this week</div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Another Technology consultant (placeholder) -->
+          <article class="c-card">
+            <div class="c-card-header">
+              <div class="avatar av-mid av-48" aria-hidden="true">KA</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Kolade Ayoola</div>
+                <div class="c-card-role">UX Lead · Andela</div>
+              </div>
+            </div>
+            <span class="pill pill-amber">Technology</span>
+            <div class="c-card-tags">
+              <span class="tag">UX Design</span>
+              <span class="tag">Product Design</span>
+              <span class="tag">Figma</span>
+            </div>
+            <div class="c-card-footer">
+              <div class="avail">Available this week</div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Third consultant -->
+          <article class="c-card">
+            <div class="c-card-header">
+              <div class="avatar av-navy av-48" aria-hidden="true">SM</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Sade Makinde</div>
+                <div class="c-card-role">Engineering Manager · Kuda Bank</div>
+              </div>
+            </div>
+            <span class="pill pill-amber">Technology</span>
+            <div class="c-card-tags">
+              <span class="tag">Engineering Leadership</span>
+              <span class="tag">Fintech</span>
+              <span class="tag">Team Building</span>
+            </div>
+            <div class="c-card-footer">
+              <div class="avail">Available this week</div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Mobile sticky book bar -->
+  <div class="mobile-book-bar" aria-label="Quick booking" role="complementary">
+    <div class="mobile-book-bar-info">
+      <strong>Taiwo Adeyemi</strong>
+      <span>Free 45-min session</span>
+    </div>
+    <button class="btn btn-amber" onclick="handleBook()">Book a Session</button>
+  </div>
+
+  <div class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+  <script src="js/app.js"></script>
+  <script>
+    // Calendar date selection
+    document.querySelectorAll('.cal-day.available').forEach(day => {
+      day.addEventListener('click', function() {
+        document.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+        this.classList.add('selected');
+        document.querySelector('.btn-amber.btn-full').textContent = `Book Session — June ${this.textContent}`;
+      });
+    });
+
+    function handleBook() {
+      showToast('Redirecting to Calendly to complete your booking...', 'success');
+      // In production: window.open('https://calendly.com/taiwo-adeyemi', '_blank');
+    }
+  </script>
+</body>
+</html>

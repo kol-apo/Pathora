@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find a Consultant — Pathora</title>
+  <meta name="description" content="Browse vetted industry consultants across Business, Finance, and Technology. Book a free 45-minute session today.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,700;0,900;1,300;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ── Page header ── */
+    .page-header {
+      background: var(--white); border-bottom: 1px solid var(--border);
+      padding: 48px 0 0;
+    }
+    .page-header-inner { padding-bottom: 32px; }
+    .page-header h1 { color: var(--navy); margin-bottom: 10px; }
+    .page-header p { font-size: 16px; color: var(--muted); max-width: 480px; }
+    .page-header-meta { display: flex; align-items: center; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+    .meta-badge { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+    .meta-badge svg { color: var(--amber); }
+
+    /* ── Sticky filter bar ── */
+    .sticky-filters {
+      position: sticky; top: 64px; z-index: 50;
+      background: rgba(250,250,247,0.95);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 14px 0;
+      transition: box-shadow 200ms;
+    }
+    .sticky-filters.shadowed { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+    .filters-inner { display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+    .filters-search { flex: 0 0 280px; }
+    .filters-pills { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+    .filters-pills::-webkit-scrollbar { display: none; }
+    .filters-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+    .results-count { font-size: 13px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+
+    /* ── Grid ── */
+    .consultants-section { padding: 40px 0 64px; }
+    .grid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+    .grid-header h2 { font-size: 16px; font-weight: 600; font-family: 'DM Sans', sans-serif; color: var(--navy); }
+    .consultants-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      transition: opacity 200ms;
+    }
+    .consultants-grid.loading { opacity: 0.5; pointer-events: none; }
+
+    /* card hidden state */
+    .c-card.hidden { display: none; }
+
+    /* Load more */
+    .load-more-wrap { display: flex; justify-content: center; margin-top: 40px; }
+
+    /* ── Bottom CTA ── */
+    .consultant-cta {
+      background: var(--navy); padding: 56px 0; margin-top: 40px;
+      position: relative; overflow: hidden;
+    }
+    .consultant-cta::before { content: ''; position: absolute; right: -80px; top: -80px; width: 320px; height: 320px; border-radius: 50%; border: 1px solid rgba(232,160,32,0.1); }
+    .consultant-cta-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; position: relative; z-index: 1; }
+    .consultant-cta h2 { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; color: var(--white); margin-bottom: 6px; }
+    .consultant-cta p { font-size: 14px; color: rgba(255,255,255,0.55); }
+
+    /* ── Responsive ── */
+    @media (max-width: 960px) {
+      .consultants-grid { grid-template-columns: 1fr 1fr; }
+      .filters-search { flex: 0 0 200px; }
+    }
+    @media (max-width: 640px) {
+      .consultants-grid { grid-template-columns: 1fr; }
+      .filters-inner { flex-wrap: wrap; }
+      .filters-search { flex: 1; }
+      .filters-right { width: 100%; justify-content: space-between; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip">Skip to main content</a>
+
+  <!-- Navbar -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="index.html" class="nav-logo" aria-label="Pathora home">Path<span class="accent">ora</span></a>
+        <ul class="nav-links" role="list">
+          <li><a href="explore.html" class="active" aria-current="page">Find a Consultant</a></li>
+          <li><a href="discover.html">Discover Your Path</a></li>
+          <li><a href="dashboard.html#opportunities">Opportunities</a></li>
+        </ul>
+        <div class="nav-actions">
+          <a href="dashboard.html" class="btn btn-outline btn-sm">Sign In</a>
+          <a href="discover.html" class="btn btn-amber btn-sm">Discover My Path</a>
+        </div>
+        <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" role="dialog" aria-label="Navigation menu" aria-modal="true">
+    <div class="mob-header">
+      <a href="index.html" class="nav-logo">Path<span class="accent">ora</span></a>
+      <button class="mob-close" aria-label="Close menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <nav class="mob-links">
+      <a href="explore.html">Find a Consultant <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+      <a href="discover.html">Discover Your Path <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+      <a href="dashboard.html#opportunities">Opportunities <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+    </nav>
+    <div class="mob-footer">
+      <a href="dashboard.html" class="btn btn-outline btn-full">Sign In</a>
+      <a href="discover.html" class="btn btn-amber btn-full">Discover My Path</a>
+    </div>
+  </div>
+
+  <main id="main">
+
+    <!-- Page Header -->
+    <header class="page-header">
+      <div class="container">
+        <div class="page-header-inner">
+          <div class="section-label" aria-hidden="true">Browse consultants</div>
+          <h1 class="h2">Find your consultant.</h1>
+          <p>Vetted professionals who've built real careers across Africa's most exciting industries — ready to talk to you for free.</p>
+          <div class="page-header-meta">
+            <div class="meta-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Join 500+ students already learning
+            </div>
+            <div class="meta-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              All consultants vetted by Pathora
+            </div>
+            <div class="meta-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Free 45-min sessions
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sticky Filters -->
+    <div class="sticky-filters" id="stickyFilters" role="search">
+      <div class="container">
+        <div class="filters-inner">
+          <div class="filters-search input-wrap">
+            <span class="input-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input type="search" class="input input-padded" id="searchInput" placeholder="Search consultants..." aria-label="Search consultants">
+          </div>
+          <div class="filters-pills filter-bar" role="group" aria-label="Filter by sector">
+            <button class="filter-pill active" data-sector="all">All</button>
+            <button class="filter-pill" data-sector="business">Business</button>
+            <button class="filter-pill" data-sector="finance">Finance</button>
+            <button class="filter-pill" data-sector="technology">Technology</button>
+          </div>
+          <div class="filters-right">
+            <select class="select" id="sortSelect" aria-label="Sort consultants" style="height: 40px; font-size: 13px;">
+              <option value="booked">Most Booked</option>
+              <option value="experience">Most Experienced</option>
+              <option value="newest">Newest</option>
+            </select>
+            <span class="results-count" id="resultsCount" aria-live="polite">Showing 6 consultants</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Consultants Grid -->
+    <section class="consultants-section">
+      <div class="container">
+        <div class="consultants-grid" id="consultantsGrid" aria-label="Consultant listings">
+
+          <!-- Taiwo Adeyemi -->
+          <article class="c-card fade-up d0" data-sector="technology" data-name="Taiwo Adeyemi" data-tags="Product Strategy Career Growth UX Tech Leadership" data-exp="8" data-sessions="47">
+            <div class="c-card-header">
+              <div class="avatar av-amber av-48" aria-hidden="true">TA</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Taiwo Adeyemi</div>
+                <div class="c-card-role">Senior Product Manager · Google</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <span class="pill pill-amber">Technology</span>
+              <span class="c-card-exp">8 years experience</span>
+            </div>
+            <div class="c-card-tags">
+              <span class="tag">Product Strategy</span>
+              <span class="tag">Career Growth</span>
+              <span class="tag">UX</span>
+              <span class="tag">Tech Leadership</span>
+            </div>
+            <div class="c-card-footer">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div class="avail">Available this week</div>
+                <span style="font-size:12px; color:var(--muted);">47 sessions</span>
+              </div>
+              <a href="consultant.html" class="btn btn-amber btn-full" onclick="window.showToast('Opening Taiwo\'s profile...','success')">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Nkechi Okafor -->
+          <article class="c-card fade-up d1" data-sector="finance" data-name="Nkechi Okafor" data-tags="Financial Modeling Investment Analysis Banking" data-exp="6" data-sessions="31">
+            <div class="c-card-header">
+              <div class="avatar av-navy av-48" aria-hidden="true">NO</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Nkechi Okafor</div>
+                <div class="c-card-role">Investment Analyst · Standard Bank</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <span class="pill pill-amber">Finance</span>
+              <span class="c-card-exp">6 years experience</span>
+            </div>
+            <div class="c-card-tags">
+              <span class="tag">Financial Modeling</span>
+              <span class="tag">Investment Analysis</span>
+              <span class="tag">Banking</span>
+            </div>
+            <div class="c-card-footer">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div class="avail">Available this week</div>
+                <span style="font-size:12px; color:var(--muted);">31 sessions</span>
+              </div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Chidi Eze -->
+          <article class="c-card fade-up d2" data-sector="technology" data-name="Chidi Eze" data-tags="Backend Engineering System Design Career Transition" data-exp="5" data-sessions="22">
+            <div class="c-card-header">
+              <div class="avatar av-green av-48" aria-hidden="true">CE</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Chidi Eze</div>
+                <div class="c-card-role">Software Engineer · Paystack</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <span class="pill pill-amber">Technology</span>
+              <span class="c-card-exp">5 years experience</span>
+            </div>
+            <div class="c-card-tags">
+              <span class="tag">Backend Engineering</span>
+              <span class="tag">System Design</span>
+              <span class="tag">Career Transition</span>
+            </div>
+            <div class="c-card-footer">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div class="avail">Available this week</div>
+                <span style="font-size:12px; color:var(--muted);">22 sessions</span>
+              </div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Amara Diallo -->
+          <article class="c-card fade-up d0" data-sector="business" data-name="Amara Diallo" data-tags="Brand Strategy Digital Marketing Leadership" data-exp="10" data-sessions="58">
+            <div class="c-card-header">
+              <div class="avatar av-mid av-48" aria-hidden="true">AD</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Amara Diallo</div>
+                <div class="c-card-role">Marketing Director · MTN</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <span class="pill pill-amber">Business</span>
+              <span class="c-card-exp">10 years experience</span>
+            </div>
+            <div class="c-card-tags">
+              <span class="tag">Brand Strategy</span>
+              <span class="tag">Digital Marketing</span>
+              <span class="tag">Leadership</span>
+            </div>
+            <div class="c-card-footer">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div class="avail">Available this week</div>
+                <span style="font-size:12px; color:var(--muted);">58 sessions</span>
+              </div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Fatima Al-Hassan -->
+          <article class="c-card fade-up d1" data-sector="finance" data-name="Fatima Al-Hassan" data-tags="Audit Tax Advisory Big 4 Graduate Programs" data-exp="7" data-sessions="38">
+            <div class="c-card-header">
+              <div class="avatar av-amber av-48" aria-hidden="true">FA</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Fatima Al-Hassan</div>
+                <div class="c-card-role">Financial Consultant · PwC</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <span class="pill pill-amber">Finance</span>
+              <span class="c-card-exp">7 years experience</span>
+            </div>
+            <div class="c-card-tags">
+              <span class="tag">Audit</span>
+              <span class="tag">Tax Advisory</span>
+              <span class="tag">Big 4</span>
+              <span class="tag">Graduate Programs</span>
+            </div>
+            <div class="c-card-footer">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div class="avail">Available this week</div>
+                <span style="font-size:12px; color:var(--muted);">38 sessions</span>
+              </div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+          <!-- Tunde Bakare -->
+          <article class="c-card fade-up d2" data-sector="business" data-name="Tunde Bakare" data-tags="Entrepreneurship Fundraising Product-Market Fit" data-exp="9" data-sessions="41">
+            <div class="c-card-header">
+              <div class="avatar av-navy av-48" aria-hidden="true">TB</div>
+              <div class="c-card-info">
+                <div class="c-card-name">Tunde Bakare</div>
+                <div class="c-card-role">Founder · AgriTech Startup</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <span class="pill pill-amber">Business</span>
+              <span class="c-card-exp">9 years experience</span>
+            </div>
+            <div class="c-card-tags">
+              <span class="tag">Entrepreneurship</span>
+              <span class="tag">Fundraising</span>
+              <span class="tag">Product-Market Fit</span>
+            </div>
+            <div class="c-card-footer">
+              <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div class="avail">Available this week</div>
+                <span style="font-size:12px; color:var(--muted);">41 sessions</span>
+              </div>
+              <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+            </div>
+          </article>
+
+        </div>
+
+        <!-- Empty state (hidden by default) -->
+        <div class="empty-state" id="emptyState" style="display:none;" aria-live="polite">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <h3>No consultants found</h3>
+          <p>No consultants found — try a different search or browse all sectors.</p>
+          <button class="btn btn-amber" onclick="resetFilters()">Show all consultants</button>
+        </div>
+
+        <!-- Load more -->
+        <div class="load-more-wrap" id="loadMoreWrap">
+          <button class="btn btn-outline-amber" id="loadMoreBtn" style="padding: 13px 32px; font-size: 14px;" onclick="showToast('More consultants coming soon!','info')">
+            Load more consultants
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <div class="consultant-cta">
+      <div class="container">
+        <div class="consultant-cta-inner">
+          <div>
+            <h2>Are you a professional?</h2>
+            <p>Join Pathora as a consultant and guide the next generation of African talent.</p>
+          </div>
+          <a href="#" class="btn btn-ghost btn-lg" onclick="showToast('Consultant applications open soon!','info'); return false;">Join as a Consultant</a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <div class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+  <script src="js/app.js"></script>
+  <script>
+    // ── Sticky filter shadow ──
+    const stickyFilters = document.getElementById('stickyFilters');
+    const stickyTop = 64;
+    window.addEventListener('scroll', () => {
+      stickyFilters.classList.toggle('shadowed', window.scrollY > stickyTop + 40);
+    }, { passive: true });
+
+    // ── Filter data ──
+    const cards = Array.from(document.querySelectorAll('.c-card'));
+    const grid  = document.getElementById('consultantsGrid');
+    const empty = document.getElementById('emptyState');
+    const countEl = document.getElementById('resultsCount');
+    const loadMoreWrap = document.getElementById('loadMoreWrap');
+
+    let activeSector = 'all';
+    let searchTerm   = '';
+    let sortMode     = 'booked';
+
+    function applyFilters() {
+      let visible = 0;
+      cards.forEach(card => {
+        const sector = card.dataset.sector;
+        const name   = card.dataset.name.toLowerCase();
+        const tags   = card.dataset.tags.toLowerCase();
+        const matchSector = activeSector === 'all' || sector === activeSector;
+        const matchSearch = !searchTerm || name.includes(searchTerm) || tags.includes(searchTerm);
+        const show = matchSector && matchSearch;
+        card.classList.toggle('hidden', !show);
+        if (show) visible++;
+      });
+
+      // Sort visible cards
+      const visibleCards = cards.filter(c => !c.classList.contains('hidden'));
+      visibleCards.sort((a, b) => {
+        if (sortMode === 'booked')     return parseInt(b.dataset.sessions) - parseInt(a.dataset.sessions);
+        if (sortMode === 'experience') return parseInt(b.dataset.exp)      - parseInt(a.dataset.exp);
+        return 0;
+      });
+      visibleCards.forEach(c => grid.appendChild(c));
+
+      countEl.textContent = `Showing ${visible} consultant${visible !== 1 ? 's' : ''}`;
+      empty.style.display = visible === 0 ? 'flex' : 'none';
+      loadMoreWrap.style.display = visible === 0 ? 'none' : 'flex';
+    }
+
+    // Sector pills
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        pill.setAttribute('aria-pressed', 'true');
+        activeSector = pill.dataset.sector;
+        applyFilters();
+      });
+    });
+
+    // Search
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        searchTerm = e.target.value.toLowerCase().trim();
+        applyFilters();
+      }, 200);
+    });
+
+    // Sort
+    document.getElementById('sortSelect').addEventListener('change', (e) => {
+      sortMode = e.target.value;
+      applyFilters();
+    });
+
+    function resetFilters() {
+      searchTerm = '';
+      activeSector = 'all';
+      document.getElementById('searchInput').value = '';
+      document.querySelectorAll('.filter-pill').forEach((p, i) => p.classList.toggle('active', i === 0));
+      applyFilters();
+    }
+
+    // Handle URL sector param
+    const params = new URLSearchParams(window.location.search);
+    const sectorParam = params.get('sector');
+    if (sectorParam) {
+      const pill = document.querySelector(`[data-sector="${sectorParam}"]`);
+      if (pill) { pill.click(); }
+    }
+  </script>
+</body>
+</html>

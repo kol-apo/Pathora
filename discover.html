@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discover Your Path — Pathora</title>
+  <meta name="description" content="Take Pathora's 6-step career discovery questionnaire and get a personalised roadmap matched to who you are.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,700;0,900;1,300;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* ── Questionnaire layout ── */
+    .discover-page {
+      min-height: calc(100vh - 64px);
+      background: var(--cream);
+      display: flex; flex-direction: column;
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar-wrap {
+      background: var(--white); border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+    }
+    .progress-steps {
+      display: flex; align-items: center; justify-content: center; gap: 0;
+      max-width: 560px; margin: 0 auto; position: relative;
+    }
+    .progress-step-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; z-index: 1; }
+    .progress-dot {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+      transition: all 300ms ease;
+    }
+    .progress-dot.upcoming { background: var(--warm-gray); color: var(--light); border: 2px solid var(--border); }
+    .progress-dot.active   { background: var(--amber); color: var(--white); border: 2px solid var(--amber); box-shadow: 0 0 0 4px rgba(232,160,32,0.2); }
+    .progress-dot.done     { background: var(--navy); color: var(--white); border: 2px solid var(--navy); }
+    .progress-dot-label { font-size: 10px; color: var(--light); font-weight: 500; white-space: nowrap; }
+    .progress-dot.active + .progress-dot-label,
+    .progress-step-wrap.active .progress-dot-label { color: var(--amber-dark); font-weight: 600; }
+    .progress-connector {
+      flex: 1; height: 2px; background: var(--border);
+      max-width: 80px; min-width: 20px; transition: background 300ms ease;
+    }
+    .progress-connector.done { background: var(--navy); }
+
+    /* ── Step container ── */
+    .step-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 20px; overflow: hidden; }
+    .step-slide {
+      max-width: 640px; width: 100%;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 20px; padding: 40px 48px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+      animation: slideIn 300ms ease forwards;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+    @keyframes slideOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-40px); } }
+    .step-slide.exiting { animation: slideOut 250ms ease forwards; }
+
+    .step-num-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--amber-dark); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .step-num-label::before { content: ''; width: 20px; height: 2px; background: var(--amber); }
+    .step-question { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1.3; margin-bottom: 8px; }
+    .step-subtext { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+    /* ── Answer options ── */
+    .options-grid { display: flex; flex-direction: column; gap: 10px; }
+    .options-grid.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .option-card {
+      padding: 14px 16px; border-radius: 12px;
+      border: 1.5px solid var(--border); background: var(--warm-gray);
+      cursor: pointer; transition: all 180ms ease;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 14px; color: var(--text); line-height: 1.4;
+      text-align: left;
+    }
+    .option-card:hover { border-color: var(--amber); background: var(--amber-light); color: var(--text); }
+    .option-card.selected { border-color: var(--amber); border-width: 2px; background: var(--amber-light); color: var(--text); }
+    .option-card.selected .option-check { opacity: 1; transform: scale(1); }
+    .option-emoji { font-size: 20px; flex-shrink: 0; width: 32px; text-align: center; }
+    .option-check {
+      margin-left: auto; flex-shrink: 0;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--amber); display: flex; align-items: center; justify-content: center;
+      opacity: 0; transform: scale(0.5); transition: all 180ms ease;
+    }
+    .option-check svg { color: var(--white); }
+
+    /* Text step */
+    .text-step-input {
+      width: 100%; min-height: 100px; padding: 14px 16px;
+      font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--text);
+      background: var(--white); border: 1.5px solid rgba(0,0,0,0.12);
+      border-radius: 10px; outline: none; transition: all 180ms ease;
+      resize: vertical; line-height: 1.6;
+    }
+    .text-step-input::placeholder { color: var(--light); }
+    .text-step-input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px rgba(232,160,32,0.15); }
+
+    /* Step footer */
+    .step-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; gap: 12px; }
+    .step-back-btn { background: none; border: none; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; padding: 8px 0; transition: color 160ms; }
+    .step-back-btn:hover { color: var(--navy); }
+    .step-next-group { display: flex; align-items: center; gap: 10px; }
+    .step-skip-btn { background: none; border: none; font-size: 13px; color: var(--light); padding: 8px 12px; transition: color 160ms; }
+    .step-skip-btn:hover { color: var(--muted); }
+
+    /* ── Loading / Thinking animation ── */
+    .loading-screen {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      min-height: calc(100vh - 64px); text-align: center; padding: 40px 20px;
+      position: relative; overflow: hidden;
+    }
+    .loading-screen.visible { display: flex; }
+    .loading-geo {
+      position: absolute; border-radius: 50%; border: 1px solid rgba(232,160,32,0.15);
+      animation: spin 12s linear infinite;
+    }
+    .loading-geo-1 { width: 600px; height: 600px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+    .loading-geo-2 { width: 400px; height: 400px; top: 50%; left: 50%; transform: translate(-50%, -50%); animation-direction: reverse; animation-duration: 8s; }
+    @keyframes spin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+    .loading-card { background: var(--white); border: 1px solid var(--border); border-radius: 20px; padding: 48px 56px; max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.08); position: relative; z-index: 1; }
+    .loading-logo { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 28px; }
+    .loading-logo .accent { color: var(--amber); }
+    .loading-dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 28px; }
+    .loading-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); animation: dotBounce 1.2s infinite ease-in-out; }
+    .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotBounce { 0%,80%,100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+    .loading-text { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; color: var(--navy); margin-bottom: 8px; transition: all 300ms ease; }
+    .loading-subtext { font-size: 14px; color: var(--muted); }
+
+    /* ── Results page ── */
+    .results-page { display: none; }
+    .results-page.visible { display: block; }
+
+    .results-header { background: var(--white); border-bottom: 1px solid var(--border); padding: 56px 0 48px; }
+    .results-header-inner { max-width: 640px; }
+    .results-header h1 { font-family: 'Fraunces', serif; font-size: clamp(30px, 4vw, 44px); font-weight: 900; letter-spacing: -1.5px; color: var(--navy); margin-bottom: 12px; }
+    .results-header p { font-size: 16px; color: var(--muted); line-height: 1.7; }
+
+    .results-content { padding: 48px 0 80px; }
+
+    /* Primary match card */
+    .primary-match {
+      background: var(--white); border: 1px solid var(--border);
+      border-left: 6px solid var(--amber); border-radius: 0 var(--r-card) var(--r-card) 0;
+      padding: 32px; margin-bottom: 24px;
+      transition: all 200ms ease; animation: fuAnim 600ms ease forwards;
+    }
+    .primary-match:hover { box-shadow: 0 12px 40px rgba(0,0,0,0.08); }
+    .match-badge-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .primary-match h2 { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 700; color: var(--navy); letter-spacing: -0.5px; margin-bottom: 14px; }
+    .match-description { font-size: 15px; color: var(--text); line-height: 1.75; margin-bottom: 20px; }
+    .match-skills { margin-bottom: 20px; }
+    .match-skills-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 8px; }
+    .match-locations { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+    .location-chip { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+    .location-chip::before { content: '●'; font-size: 8px; color: var(--amber); }
+
+    /* Roadmap */
+    .roadmap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
+    .roadmap-step { padding: 14px; background: var(--warm-gray); border-radius: 10px; }
+    .roadmap-step-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--amber-dark); margin-bottom: 6px; }
+    .roadmap-step p { font-size: 13px; color: var(--text); line-height: 1.55; }
+
+    /* Secondary matches */
+    .secondary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 64px; }
+    .secondary-match {
+      background: var(--white); border: 1px solid var(--border);
+      border-left: 4px solid var(--navy); border-radius: 0 var(--r-card) var(--r-card) 0;
+      padding: 22px; cursor: pointer;
+      transition: all 200ms ease;
+      animation: fuAnim 600ms 150ms ease both;
+    }
+    .secondary-match:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); border-color: var(--amber); border-left-color: var(--amber); }
+    .secondary-match h3 { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+    .secondary-match p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+    .explore-link { font-size: 13px; font-weight: 600; color: var(--amber-dark); display: flex; align-items: center; gap: 4px; }
+
+    /* Bridge section */
+    .bridge-section { background: var(--warm-gray); border-radius: var(--r-card); padding: 36px; margin-bottom: 40px; }
+    .bridge-header { margin-bottom: 28px; }
+    .bridge-header h2 { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+    .bridge-header p { font-size: 15px; color: var(--muted); }
+    .bridge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    .bridge-link { text-align: center; margin-top: 4px; }
+    .bridge-link a { font-size: 14px; font-weight: 600; color: var(--amber-dark); display: inline-flex; align-items: center; gap: 6px; }
+
+    /* Results actions */
+    .results-actions { display: flex; align-items: center; justify-content: space-between; padding: 24px; background: var(--white); border: 1px solid var(--border); border-radius: var(--r-card); flex-wrap: wrap; gap: 16px; }
+    .results-actions p { font-size: 13px; color: var(--muted); }
+    .results-actions-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .step-slide { padding: 28px 22px; }
+      .options-grid.two-col { grid-template-columns: 1fr; }
+      .roadmap { grid-template-columns: 1fr; }
+      .secondary-grid { grid-template-columns: 1fr; }
+      .bridge-grid { grid-template-columns: 1fr; }
+      .progress-steps { gap: 0; }
+      .progress-dot-label { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip">Skip to main content</a>
+
+  <!-- Navbar -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="index.html" class="nav-logo" aria-label="Pathora home">Path<span class="accent">ora</span></a>
+        <ul class="nav-links" role="list">
+          <li><a href="explore.html">Find a Consultant</a></li>
+          <li><a href="discover.html" class="active" aria-current="page">Discover Your Path</a></li>
+        </ul>
+        <div class="nav-actions">
+          <a href="dashboard.html" class="btn btn-outline btn-sm">Sign In</a>
+          <a href="explore.html" class="btn btn-navy btn-sm">Find a Consultant</a>
+        </div>
+        <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div class="mobile-menu" role="dialog" aria-label="Navigation menu" aria-modal="true">
+    <div class="mob-header">
+      <a href="index.html" class="nav-logo">Path<span class="accent">ora</span></a>
+      <button class="mob-close" aria-label="Close menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <nav class="mob-links">
+      <a href="explore.html">Find a Consultant <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+      <a href="discover.html">Discover Your Path <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>
+    </nav>
+    <div class="mob-footer">
+      <a href="dashboard.html" class="btn btn-outline btn-full">Sign In</a>
+    </div>
+  </div>
+
+  <main id="main">
+
+    <!-- Questionnaire view -->
+    <div id="questionnaireView">
+
+      <!-- Progress Bar -->
+      <div class="progress-bar-wrap" aria-label="Questionnaire progress">
+        <div class="container">
+          <div class="progress-steps" role="list">
+            <div class="progress-step-wrap active" role="listitem" id="progressStep0">
+              <div class="progress-dot active" id="pdot0">1</div>
+              <div class="progress-dot-label">Start</div>
+            </div>
+            <div class="progress-connector" id="pcon0"></div>
+            <div class="progress-step-wrap" role="listitem">
+              <div class="progress-dot upcoming" id="pdot1">2</div>
+              <div class="progress-dot-label">Interests</div>
+            </div>
+            <div class="progress-connector" id="pcon1"></div>
+            <div class="progress-step-wrap" role="listitem">
+              <div class="progress-dot upcoming" id="pdot2">3</div>
+              <div class="progress-dot-label">Style</div>
+            </div>
+            <div class="progress-connector" id="pcon2"></div>
+            <div class="progress-step-wrap" role="listitem">
+              <div class="progress-dot upcoming" id="pdot3">4</div>
+              <div class="progress-dot-label">Strengths</div>
+            </div>
+            <div class="progress-connector" id="pcon3"></div>
+            <div class="progress-step-wrap" role="listitem">
+              <div class="progress-dot upcoming" id="pdot4">5</div>
+              <div class="progress-dot-label">Vision</div>
+            </div>
+            <div class="progress-connector" id="pcon4"></div>
+            <div class="progress-step-wrap" role="listitem">
+              <div class="progress-dot upcoming" id="pdot5">6</div>
+              <div class="progress-dot-label">Context</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step container -->
+      <div class="step-container" id="stepContainer">
+        <!-- Steps rendered by JS -->
+      </div>
+
+    </div>
+
+    <!-- Loading screen -->
+    <div class="loading-screen" id="loadingScreen" aria-live="polite" aria-label="Analysing your answers">
+      <div class="loading-geo loading-geo-1" aria-hidden="true"></div>
+      <div class="loading-geo loading-geo-2" aria-hidden="true"></div>
+      <div class="loading-card">
+        <div class="loading-logo">Path<span class="accent">ora</span></div>
+        <div class="loading-dots" aria-hidden="true">
+          <div class="loading-dot"></div>
+          <div class="loading-dot"></div>
+          <div class="loading-dot"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Analysing your answers...</div>
+        <div class="loading-subtext">This takes just a moment</div>
+      </div>
+    </div>
+
+    <!-- Results page -->
+    <div class="results-page" id="resultsPage">
+
+      <!-- Results header -->
+      <div class="results-header">
+        <div class="container">
+          <div class="results-header-inner">
+            <div class="section-label" aria-hidden="true">Your results</div>
+            <h1>Here's what we found for you.</h1>
+            <p>Based on your answers, these career paths align strongly with who you are and what you'll genuinely excel at.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results content -->
+      <div class="results-content">
+        <div class="container">
+
+          <!-- Primary match (populated by JS) -->
+          <div id="primaryMatchEl"></div>
+
+          <!-- Secondary matches (populated by JS) -->
+          <div class="secondary-grid" id="secondaryMatchesEl"></div>
+
+          <!-- THE BRIDGE -->
+          <div class="bridge-section" id="bridgeSection">
+            <div class="bridge-header">
+              <div class="section-label" aria-hidden="true">Next step</div>
+              <h2>Talk to someone in this field.</h2>
+              <p id="bridgeSubtext">These consultants work in your matched sector. Book a free session and ask them everything.</p>
+            </div>
+            <div class="bridge-grid" id="bridgeGrid">
+              <!-- Populated by JS -->
+            </div>
+            <div class="bridge-link">
+              <a href="explore.html" id="bridgeSeeAllLink">See all consultants →</a>
+            </div>
+          </div>
+
+          <!-- Results actions -->
+          <div class="results-actions">
+            <p>Save your results and track your progress over time.</p>
+            <div class="results-actions-btns">
+              <button class="btn btn-amber" onclick="showToast('Create an account to save your results!','info')">Save My Results</button>
+              <button class="btn btn-outline" onclick="retake()">Retake Assessment</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <div class="toast-wrap" aria-live="polite" aria-atomic="true"></div>
+  <script src="js/app.js"></script>
+  <script>
+  // ══════════════════════════════════════════
+  // PATHORA — Career Discovery Engine
+  // ══════════════════════════════════════════
+
+  const STEPS = [
+    {
+      id: 0,
+      label: 'Step 1 of 6',
+      question: "Let's figure out where you're headed. How would you describe yourself right now?",
+      subtext: "There's no wrong answer — this helps us understand where you're starting from.",
+      multi: false,
+      options: [
+        { label: "I have some ideas but I'm not sure", signal: 'exploring' },
+        { label: "I'm completely lost and that's okay", signal: 'discovering' },
+        { label: "I know what I want but need direction", signal: 'focused' },
+        { label: "I'm curious about my options", signal: 'exploring' },
+      ]
+    },
+    {
+      id: 1,
+      label: 'Step 2 of 6',
+      question: "What topics genuinely excite you? Pick all that apply.",
+      subtext: "Select everything that resonates — there's no limit.",
+      multi: true,
+      twoCol: true,
+      options: [
+        { label: "Building & Creating", emoji: "🔨", signal: 'tech' },
+        { label: "Numbers & Analysis", emoji: "📊", signal: 'finance' },
+        { label: "People & Communication", emoji: "🤝", signal: 'business' },
+        { label: "Technology & Systems", emoji: "💻", signal: 'tech' },
+        { label: "Business & Strategy", emoji: "📈", signal: 'business' },
+        { label: "Research & Learning", emoji: "🔬", signal: 'finance' },
+        { label: "Design & Aesthetics", emoji: "✦", signal: 'tech' },
+        { label: "Leadership & Impact", emoji: "⚡", signal: 'business' },
+      ]
+    },
+    {
+      id: 2,
+      label: 'Step 3 of 6',
+      question: "Which environment sounds most like you?",
+      subtext: "Think about where you naturally thrive.",
+      multi: false,
+      options: [
+        { label: "I like solving problems with logic and data", signal: 'finance' },
+        { label: "I like building things people actually use", signal: 'tech' },
+        { label: "I like understanding how markets and money work", signal: 'finance' },
+        { label: "I like leading, communicating, and convincing people", signal: 'business' },
+      ]
+    },
+    {
+      id: 3,
+      label: 'Step 4 of 6',
+      question: "What do people come to you for?",
+      subtext: "Your natural strengths say a lot about where you'll excel.",
+      multi: false,
+      options: [
+        { label: "Explaining complex things simply", signal: 'business' },
+        { label: "Figuring out why something isn't working", signal: 'tech' },
+        { label: "Coming up with creative ideas", signal: 'tech' },
+        { label: "Getting things organised and done", signal: 'finance' },
+        { label: "Understanding people and situations", signal: 'business' },
+      ]
+    },
+    {
+      id: 4,
+      label: 'Step 5 of 6',
+      question: "In 10 years, which version of you sounds right?",
+      subtext: "Don't overthink it — go with what feels true.",
+      multi: false,
+      options: [
+        { label: "Running my own company", signal: 'business' },
+        { label: "Leading a team at a major company", signal: 'business' },
+        { label: "Being the expert everyone calls", signal: 'finance' },
+        { label: "Creating things that exist in the world", signal: 'tech' },
+        { label: "Making systems and institutions work better", signal: 'tech' },
+      ]
+    },
+    {
+      id: 5,
+      label: 'Step 6 of 6',
+      question: "One last thing — what are you studying or what field are you in?",
+      subtext: "This helps us personalise your results. Skip if you'd prefer.",
+      multi: false,
+      isTextStep: true,
+    }
+  ];
+
+  const CAREER_PATHS = {
+    tech: {
+      primary: {
+        title: "Product Design & UX",
+        sector: "Technology",
+        badge: "Your Strongest Match",
+        description: "You have a rare blend of systems thinking, creativity, and user empathy — the exact combination that makes great product designers and UX leads. You understand that technology should serve people, not the other way around, and that instinct is what separates good designers from exceptional ones.",
+        skills: ["User Research", "Figma & Prototyping", "Product Thinking", "Information Architecture", "Usability Testing"],
+        locations: ["Lagos", "Nairobi", "Kigali", "Cape Town", "Accra"],
+        roadmap: [
+          { label: "Year 1", text: "Build portfolio with 3 case studies. Learn Figma. Complete a UX bootcamp or structured self-study." },
+          { label: "Year 2", text: "Land a junior design role or internship at a startup. Contribute to real products." },
+          { label: "Year 3+", text: "Senior designer or product lead. Specialise in a domain — fintech, health, education." }
+        ]
+      },
+      secondary: [
+        { title: "Software Engineering", description: "Build the actual products you love using. Engineering opens every door in tech — from startups to global companies.", signal: 'tech' },
+        { title: "Product Management", description: "Lead product strategy and work at the intersection of design, engineering, and business. High impact, high growth.", signal: 'tech' }
+      ],
+      consultants: ['taiwo', 'chidi']
+    },
+    finance: {
+      primary: {
+        title: "Investment Banking & Financial Analysis",
+        sector: "Finance",
+        badge: "Your Strongest Match",
+        description: "You're driven by precision, patterns, and the logic of markets. You understand that financial modelling isn't just maths — it's storytelling with numbers. Your combination of analytical rigour and structured thinking makes you well-suited to Africa's growing financial services sector.",
+        skills: ["Financial Modelling", "Valuation", "Excel & PowerPoint", "Market Research", "Investment Analysis"],
+        locations: ["Lagos", "Johannesburg", "Nairobi", "Accra", "Kigali"],
+        roadmap: [
+          { label: "Year 1", text: "Master Excel and financial modelling fundamentals. Target Big 4 or graduate banking programmes." },
+          { label: "Year 2", text: "Analyst role at a bank, consulting firm, or investment fund. Build your deal track record." },
+          { label: "Year 3+", text: "Associate level. Specialise in sectors — energy, telecoms, agribusiness — where African deals are biggest." }
+        ]
+      },
+      secondary: [
+        { title: "Management Consulting", description: "Solve business problems for major organisations. Work across industries and build a broad foundation.", signal: 'finance' },
+        { title: "Fintech & Digital Finance", description: "Combine finance knowledge with tech's pace. Africa's fintech sector is one of the world's fastest-growing.", signal: 'finance' }
+      ],
+      consultants: ['nkechi', 'fatima']
+    },
+    business: {
+      primary: {
+        title: "Brand Strategy & Marketing",
+        sector: "Business",
+        badge: "Your Strongest Match",
+        description: "You have a natural gift for understanding people — what moves them, what they value, how they make decisions. Marketing and brand strategy is where that human intelligence becomes your greatest professional asset. You see the stories behind the data and the emotion behind the strategy.",
+        skills: ["Brand Positioning", "Digital Marketing", "Consumer Insights", "Campaign Strategy", "Leadership"],
+        locations: ["Lagos", "Abidjan", "Accra", "Nairobi", "Kigali"],
+        roadmap: [
+          { label: "Year 1", text: "Learn digital marketing fundamentals. Work on campaigns — agency or brand-side. Build your portfolio." },
+          { label: "Year 2", text: "Marketing manager role. Own a channel or campaign type. Start developing strategic thinking." },
+          { label: "Year 3+", text: "Senior marketing or brand lead. Drive strategy across an entire business unit or brand." }
+        ]
+      },
+      secondary: [
+        { title: "Entrepreneurship & Startups", description: "Build something from scratch. Your understanding of people and markets is exactly what founders need.", signal: 'business' },
+        { title: "Business Development", description: "Open new markets, close partnerships, grow revenue. The most relationship-driven role in business.", signal: 'business' }
+      ],
+      consultants: ['amara', 'tunde']
+    }
+  };
+
+  const CONSULTANTS = {
+    taiwo: { name: "Taiwo Adeyemi", role: "Senior PM · Google", av: "TA", avClass: "av-amber", sector: "Technology", tags: ["Product Strategy", "Career Growth", "Tech Leadership"] },
+    chidi: { name: "Chidi Eze", role: "Software Engineer · Paystack", av: "CE", avClass: "av-green", sector: "Technology", tags: ["Backend Engineering", "System Design", "Career Transition"] },
+    nkechi: { name: "Nkechi Okafor", role: "Investment Analyst · Standard Bank", av: "NO", avClass: "av-navy", sector: "Finance", tags: ["Financial Modeling", "Investment Analysis", "Banking"] },
+    fatima: { name: "Fatima Al-Hassan", role: "Financial Consultant · PwC", av: "FA", avClass: "av-mid", sector: "Finance", tags: ["Audit", "Tax Advisory", "Big 4"] },
+    amara: { name: "Amara Diallo", role: "Marketing Director · MTN", av: "AD", avClass: "av-mid", sector: "Business", tags: ["Brand Strategy", "Digital Marketing", "Leadership"] },
+    tunde: { name: "Tunde Bakare", role: "Founder · AgriTech Startup", av: "TB", avClass: "av-navy", sector: "Business", tags: ["Entrepreneurship", "Fundraising", "Product-Market Fit"] },
+  };
+
+  // ── State ──
+  let currentStep = 0;
+  let answers = new Array(STEPS.length).fill(null).map(() => []);
+  const scores = { tech: 0, finance: 0, business: 0 };
+
+  // ── Render step ──
+  function renderStep(index, direction = 'forward') {
+    const container = document.getElementById('stepContainer');
+    const step = STEPS[index];
+
+    // Remove old slide
+    const oldSlide = container.querySelector('.step-slide');
+    if (oldSlide) {
+      oldSlide.classList.add('exiting');
+      setTimeout(() => oldSlide.remove(), 250);
+    }
+
+    // Build new slide
+    const slide = document.createElement('div');
+    slide.className = 'step-slide';
+    slide.setAttribute('role', 'form');
+    slide.setAttribute('aria-label', `Step ${index + 1} of 6`);
+
+    let optionsHTML = '';
+
+    if (step.isTextStep) {
+      optionsHTML = `
+        <textarea class="text-step-input" id="textAnswer" placeholder="e.g. Computer Science, Economics, Secondary school..." aria-label="${step.question}"></textarea>
+      `;
+    } else {
+      const gridClass = step.twoCol ? 'options-grid two-col' : 'options-grid';
+      const emojiItems = step.options.map((opt, i) => {
+        const emoji = opt.emoji ? `<span class="option-emoji" aria-hidden="true">${opt.emoji}</span>` : '';
+        return `
+          <button class="option-card" data-index="${i}" data-signal="${opt.signal}" aria-pressed="false">
+            ${emoji}
+            <span>${opt.label}</span>
+            <span class="option-check" aria-hidden="true">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+          </button>
+        `;
+      }).join('');
+      optionsHTML = `<div class="${gridClass}" role="group" aria-label="Answer options">${emojiItems}</div>`;
+    }
+
+    slide.innerHTML = `
+      <div class="step-num-label">${step.label}</div>
+      <h2 class="step-question">${step.question}</h2>
+      <p class="step-subtext">${step.subtext}</p>
+      ${optionsHTML}
+      <div class="step-footer">
+        <button class="step-back-btn" id="backBtn" ${index === 0 ? 'style="visibility:hidden"' : ''} aria-label="Go back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <div class="step-next-group">
+          ${step.isTextStep ? `<button class="step-skip-btn" id="skipBtn">Skip</button>` : ''}
+          <button class="btn btn-amber" id="nextBtn" ${!step.isTextStep && !step.multi ? 'disabled' : ''} style="${step.isTextStep ? '' : (!step.multi ? 'opacity:0.45;pointer-events:none;' : '')}">
+            ${index === STEPS.length - 1 ? 'See My Results →' : 'Next →'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Restore previous answers
+    setTimeout(() => {
+      if (!step.isTextStep) {
+        const prev = answers[index];
+        slide.querySelectorAll('.option-card').forEach(btn => {
+          if (prev.includes(parseInt(btn.dataset.index))) {
+            btn.classList.add('selected');
+            btn.setAttribute('aria-pressed', 'true');
+          }
+        });
+        if (step.multi && prev.length > 0) enableNextBtn(slide);
+        if (!step.multi && prev.length > 0) enableNextBtn(slide);
+      }
+    }, 50);
+
+    setTimeout(() => container.appendChild(slide), oldSlide ? 260 : 0);
+
+    // Events
+    setTimeout(() => {
+      const nextBtn = slide.querySelector('#nextBtn');
+      const backBtn = slide.querySelector('#backBtn');
+      const skipBtn = slide.querySelector('#skipBtn');
+
+      // Option selection
+      slide.querySelectorAll('.option-card').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const i = parseInt(btn.dataset.index);
+          if (step.multi) {
+            btn.classList.toggle('selected');
+            btn.setAttribute('aria-pressed', btn.classList.contains('selected') ? 'true' : 'false');
+            const selected = Array.from(slide.querySelectorAll('.option-card.selected')).map(b => parseInt(b.dataset.index));
+            answers[index] = selected;
+            selected.length > 0 ? enableNextBtn(slide) : disableNextBtn(slide);
+          } else {
+            slide.querySelectorAll('.option-card').forEach(b => { b.classList.remove('selected'); b.setAttribute('aria-pressed', 'false'); });
+            btn.classList.add('selected');
+            btn.setAttribute('aria-pressed', 'true');
+            answers[index] = [i];
+            enableNextBtn(slide);
+            // Auto advance single-select after short delay
+            setTimeout(() => nextBtn && nextBtn.click(), 400);
+          }
+        });
+      });
+
+      nextBtn && nextBtn.addEventListener('click', () => {
+        // Collect text answer
+        if (step.isTextStep) {
+          const ta = document.getElementById('textAnswer');
+          answers[index] = ta ? [ta.value.trim()] : [''];
+        }
+        advance();
+      });
+
+      backBtn && backBtn.addEventListener('click', () => {
+        if (currentStep > 0) { currentStep--; updateProgress(); renderStep(currentStep, 'back'); }
+      });
+
+      skipBtn && skipBtn.addEventListener('click', () => {
+        answers[index] = [];
+        advance();
+      });
+    }, oldSlide ? 310 : 50);
+  }
+
+  function enableNextBtn(slide) {
+    const btn = slide.querySelector('#nextBtn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; }
+  }
+
+  function disableNextBtn(slide) {
+    const btn = slide.querySelector('#nextBtn');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.45'; btn.style.pointerEvents = 'none'; }
+  }
+
+  function advance() {
+    if (currentStep < STEPS.length - 1) {
+      currentStep++;
+      updateProgress();
+      renderStep(currentStep);
+    } else {
+      showLoading();
+    }
+  }
+
+  // ── Progress ──
+  function updateProgress() {
+    for (let i = 0; i < STEPS.length; i++) {
+      const dot = document.getElementById(`pdot${i}`);
+      const con = document.getElementById(`pcon${i}`);
+      if (dot) {
+        dot.classList.remove('active', 'upcoming', 'done');
+        if (i < currentStep) { dot.classList.add('done'); dot.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`; }
+        else if (i === currentStep) { dot.classList.add('active'); dot.textContent = i + 1; }
+        else { dot.classList.add('upcoming'); dot.textContent = i + 1; }
+      }
+      if (con) con.classList.toggle('done', i < currentStep);
+    }
+  }
+
+  // ── Scoring ──
+  function computeCareerMatch() {
+    const sc = { tech: 0, finance: 0, business: 0 };
+    answers.forEach((stepAnswers, stepIdx) => {
+      const step = STEPS[stepIdx];
+      if (step.isTextStep || !step.options) return;
+      stepAnswers.forEach(optIdx => {
+        const opt = step.options[optIdx];
+        if (opt && opt.signal && sc[opt.signal] !== undefined) sc[opt.signal]++;
+      });
+    });
+    return Object.entries(sc).sort((a, b) => b[1] - a[1])[0][0];
+  }
+
+  // ── Loading ──
+  const loadingTexts = ['Analysing your answers...', 'Finding your strongest matches...', 'Building your roadmap...', 'Almost ready...'];
+
+  function showLoading() {
+    document.getElementById('questionnaireView').style.display = 'none';
+    const ls = document.getElementById('loadingScreen');
+    ls.classList.add('visible');
+
+    let t = 0;
+    const ltEl = document.getElementById('loadingText');
+    const interval = setInterval(() => {
+      t = (t + 1) % loadingTexts.length;
+      ltEl.style.opacity = '0';
+      setTimeout(() => { ltEl.textContent = loadingTexts[t]; ltEl.style.opacity = '1'; }, 150);
+    }, 600);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      ls.classList.remove('visible');
+      showResults();
+    }, 2500);
+  }
+
+  // ── Results ──
+  function showResults() {
+    const match = computeCareerMatch();
+    const path = CAREER_PATHS[match];
+    const primary = path.primary;
+
+    // Primary match
+    const skillTags = primary.skills.map(s => `<span class="tag" style="padding:5px 11px; font-size:12px;">${s}</span>`).join('');
+    const roadmapHTML = primary.roadmap.map(r => `
+      <div class="roadmap-step">
+        <div class="roadmap-step-label">${r.label}</div>
+        <p>${r.text}</p>
+      </div>
+    `).join('');
+    const locHTML = primary.locations.map(l => `<span class="location-chip">${l}</span>`).join('');
+
+    document.getElementById('primaryMatchEl').innerHTML = `
+      <div class="primary-match">
+        <div class="match-badge-row">
+          <span class="pill pill-amber" style="font-size:12px; padding:4px 12px;">${primary.badge}</span>
+          <span class="pill pill-amber" style="font-size:12px; padding:4px 12px;">${primary.sector}</span>
+        </div>
+        <h2>${primary.title}</h2>
+        <p class="match-description">${primary.description}</p>
+        <div class="match-skills">
+          <div class="match-skills-label">Key skills this path uses</div>
+          <div style="display:flex; flex-wrap:wrap; gap:7px; margin-top:6px;">${skillTags}</div>
+        </div>
+        <div class="match-skills-label" style="margin-bottom:8px;">Typical roles in Africa</div>
+        <div class="match-locations">${locHTML}</div>
+        <div class="roadmap">${roadmapHTML}</div>
+      </div>
+    `;
+
+    // Secondary matches
+    document.getElementById('secondaryMatchesEl').innerHTML = path.secondary.map(s => `
+      <div class="secondary-match">
+        <div class="match-badge-row" style="margin-bottom:10px;">
+          <span class="pill pill-navy" style="font-size:11px;">Good Match</span>
+        </div>
+        <h3>${s.title}</h3>
+        <p>${s.description}</p>
+        <div class="explore-link">Explore this path <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>
+    `).join('');
+
+    // Bridge consultants
+    document.getElementById('bridgeSubtext').textContent = `These consultants work in ${primary.sector}. Book a free session and ask them everything.`;
+    document.getElementById('bridgeSeeAllLink').href = `explore.html?sector=${primary.sector.toLowerCase()}`;
+    document.getElementById('bridgeSeeAllLink').textContent = `See all ${primary.sector} consultants →`;
+
+    const bridgeHTML = path.consultants.map(key => {
+      const c = CONSULTANTS[key];
+      return `
+        <div class="c-card">
+          <div class="c-card-header">
+            <div class="avatar ${c.avClass} av-48" aria-hidden="true">${c.av}</div>
+            <div class="c-card-info">
+              <div class="c-card-name">${c.name}</div>
+              <div class="c-card-role">${c.role}</div>
+            </div>
+          </div>
+          <span class="pill pill-amber">${c.sector}</span>
+          <div class="c-card-tags">${c.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+          <div class="c-card-footer">
+            <div class="avail">Available this week</div>
+            <a href="consultant.html" class="btn btn-amber btn-full">Book a Session</a>
+          </div>
+        </div>
+      `;
+    }).join('');
+    document.getElementById('bridgeGrid').innerHTML = bridgeHTML;
+
+    document.getElementById('resultsPage').classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function retake() {
+    currentStep = 0;
+    answers = new Array(STEPS.length).fill(null).map(() => []);
+    document.getElementById('resultsPage').classList.remove('visible');
+    document.getElementById('questionnaireView').style.display = '';
+    updateProgress();
+    renderStep(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Init ──
+  renderStep(0);
+  </script>
+</body>
+</html>
