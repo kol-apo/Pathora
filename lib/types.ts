@@ -1,23 +1,28 @@
-export type Sector = 'Business' | 'Finance' | 'Technology';
+export type Sector = 'Entrepreneurship' | 'Technology' | 'Finance' | 'Creative';
+
+export const SECTORS: Sector[] = ['Entrepreneurship', 'Technology', 'Finance', 'Creative'];
 
 export interface Consultant {
   id: string;
   name: string;
   initials: string;
-  avatarColor: string;
   role: string;
   company: string;
   sector: Sector;
   experience: number;
+  /** Two short phrases shown as outlined pills on the card. */
+  focus: string[];
+  /** Longer expertise list shown on the profile page. */
   tags: string[];
   bio: string;
   sessions: number;
   rating: number;
-  available: boolean;
+  /** `null` means available this week; otherwise the wait, e.g. "in 2 weeks". */
+  nextSlot: string | null;
   helpWith: string[];
 }
 
-export type OpportunityType = 'Fellowship' | 'Hackathon' | 'Internship' | 'Campus Program';
+export type OpportunityType = 'Fellowship' | 'Hackathon' | 'Internship' | 'Campus program';
 
 export interface Opportunity {
   id: string;
@@ -25,6 +30,7 @@ export interface Opportunity {
   organisation: string;
   type: OpportunityType;
   sector: Sector;
+  /** A closing date such as "14 Sep", or "Rolling" for open applications. */
   deadline: string;
   urgent: boolean;
   description: string;
@@ -33,9 +39,12 @@ export interface Opportunity {
 
 export interface UpcomingSession {
   consultant: Consultant;
-  date: string;
-  time: string;
+  /** Session topic, e.g. "Product career review". */
+  topic: string;
+  when: string;
   duration: string;
+  format: string;
+  notes: string[];
 }
 
 export interface Student {
@@ -49,6 +58,11 @@ export interface Student {
   sessionsBooked: number;
   consultantsExplored: number;
   opportunitiesSaved: number;
+  /** Career-path progress shown on the dashboard roadmap strip. */
+  pathYear: number;
+  pathYears: number;
+  milestonesDone: number;
+  milestonesTotal: number;
   upcomingSession: UpcomingSession;
 }
 

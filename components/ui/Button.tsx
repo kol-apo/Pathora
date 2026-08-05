@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'ghost-dark' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'on-dark' | 'on-dark-solid';
 type Size = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -12,27 +12,24 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary:
-    'bg-amber text-white hover:bg-amber-dark shadow-[0_4px_14px_rgba(232,160,32,0.35)]',
-  secondary: 'bg-navy text-white hover:bg-navy-mid',
-  ghost:
-    'bg-transparent text-text-main border border-black/10 hover:border-amber hover:text-amber-dark',
-  'ghost-dark':
-    'bg-transparent text-white border border-white/30 hover:border-white hover:bg-white/10',
-  danger: 'bg-red-600 text-white hover:bg-red-700',
+  primary: 'bg-ink-soft text-white hover:bg-black',
+  secondary: 'bg-white text-ink border border-line hover:bg-surface hover:border-faint/40',
+  ghost: 'bg-transparent text-muted hover:text-ink',
+  'on-dark': 'border border-white/20 text-white/80 hover:bg-white/10 hover:text-white',
+  'on-dark-solid': 'bg-white text-ink hover:bg-white/90',
 };
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-9 px-4 text-sm',
-  md: 'h-11 px-6 text-sm',
-  lg: 'h-[52px] px-8 text-[15px]',
+  sm: 'h-9 px-3.5 text-[13px]',
+  md: 'h-[42px] px-[18px] text-sm',
+  lg: 'h-[46px] px-6 text-sm',
 };
 
 export default function Button({
   variant = 'primary',
   size = 'md',
   icon,
-  iconPosition = 'right',
+  iconPosition = 'left',
   fullWidth = false,
   className = '',
   children,
@@ -40,7 +37,7 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-[10px] font-semibold transition-all duration-[180ms] ease-out hover:scale-[1.02] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40 ${variantClasses[variant]} ${sizeClasses[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
       {...rest}
     >
       {icon && iconPosition === 'left' && icon}

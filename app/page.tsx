@@ -1,96 +1,39 @@
 import Link from 'next/link';
-import {
-  CalendarCheck,
-  Compass,
-  LineChart,
-  Monitor,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  TrendingUp,
-  Users,
-  Zap,
-} from 'lucide-react';
+import { ShieldCheck, Star } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
 import { consultants } from '@/lib/data';
-
-const heroAvatars = [
-  { initials: 'AO', color: '#E8A020' },
-  { initials: 'KM', color: '#1A6B4A' },
-  { initials: 'ZN', color: '#1C3461' },
-  { initials: 'DA', color: '#533AB7' },
-];
+import { SECTORS } from '@/lib/types';
 
 const steps = [
   {
     number: '01',
-    icon: Compass,
-    title: 'Discover Your Path',
+    title: 'Answer six questions',
     description:
-      'Answer six quick questions and our AI guide matches you to career paths that fit who you actually are.',
+      'A short questionnaire that reads who you actually are, not what sounds impressive on paper.',
   },
   {
     number: '02',
-    icon: Users,
-    title: 'Find a Consultant',
+    title: 'See paths that fit',
     description:
-      'Browse vetted professionals across Business, Finance, and Technology — people doing the job you want.',
+      'Career directions matched to your answers, each with a three-year roadmap for the African market.',
   },
   {
     number: '03',
-    icon: CalendarCheck,
-    title: 'Book a Session',
+    title: 'Talk to someone doing it',
     description:
-      'Book a free 1:1 video session and get answers no career textbook will ever give you.',
+      'Every result ends with vetted consultants in that field. Book a free video call and ask them everything.',
   },
 ];
 
-const sectors = [
-  {
-    icon: TrendingUp,
-    name: 'Business',
-    description: 'Marketing, strategy, entrepreneurship, and operations across African markets.',
-    count: '40+ consultants',
-  },
-  {
-    icon: LineChart,
-    name: 'Finance',
-    description: 'Investment banking, Big 4, audit, and everything the CFA books leave out.',
-    count: '35+ consultants',
-  },
-  {
-    icon: Monitor,
-    name: 'Technology',
-    description: 'Engineering, product, design, and data at startups and global tech companies.',
-    count: '45+ consultants',
-  },
-];
-
-const features = [
-  {
-    icon: Sparkles,
-    title: 'AI Career Discovery',
-    description: 'A guided questionnaire that turns who you are into where you should be heading.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Vetted Consultants',
-    description: 'Every professional is reviewed and approved by the Pathora team before they appear.',
-  },
-  {
-    icon: Zap,
-    title: 'Opportunities Feed',
-    description: 'Fellowships, hackathons, internships, and ambassador programs — curated for Africa.',
-  },
-  {
-    icon: CalendarCheck,
-    title: 'Instant Booking',
-    description: 'See availability, pick a slot, meet on video. No cold emails, no gatekeepers.',
-  },
-];
+const sectorBlurbs: Record<string, string> = {
+  Entrepreneurship: 'Founders, marketers, and operators building companies across the continent.',
+  Technology: 'Engineering, product, and data at startups and global technology companies.',
+  Finance: 'Investment banking, Big 4, and audit — including what the textbooks leave out.',
+  Creative: 'Design, film, and content, plus the business side nobody teaches you.',
+};
 
 const testimonials = [
   {
@@ -99,59 +42,50 @@ const testimonials = [
     name: 'Chiamaka U.',
     role: 'Economics, University of Nigeria',
     initials: 'CU',
-    color: '#1A6B4A',
   },
   {
     quote:
-      'The discovery quiz told me product design fit me — then it showed me three designers to talk to. That bridge is everything.',
+      'The questionnaire pointed me at product design, then showed me three designers to talk to. That bridge is the whole thing.',
     name: 'Yannick H.',
     role: 'Computer Science, ALU Rwanda',
     initials: 'YH',
-    color: '#1C3461',
   },
   {
     quote:
-      'My consultant reviewed my Big 4 application line by line. I got the internship. This platform is unfair advantage.',
+      'My consultant reviewed my Big 4 application line by line. I got the internship. Nothing else came close.',
     name: 'Salma B.',
     role: 'Accounting, University of Ghana',
     initials: 'SB',
-    color: '#B87A10',
   },
 ];
 
-const chatMessages = [
-  { from: 'ai', text: "Hi Emeka! Let's figure out your path. What excites you most about tech?" },
-  { from: 'student', text: 'I love making things people actually use — apps, interfaces, that kind of thing.' },
-  { from: 'ai', text: 'Interesting — do you prefer designing how it looks or building how it works?' },
-  { from: 'student', text: 'Honestly? How it looks and feels. I sketch app ideas all the time.' },
-];
-
 function HeroConsultantCard({ consultant }: { consultant: (typeof consultants)[number] }) {
+  const c = consultant;
   return (
-    <div className="w-full max-w-xs rounded-xl border border-white/10 bg-white p-5 shadow-card-hover">
+    <div className="flex w-full max-w-xs flex-col gap-3.5 rounded-lg border border-line bg-white p-5 shadow-card">
       <div className="flex items-center gap-3">
-        <Avatar initials={consultant.initials} color={consultant.avatarColor} size="md" />
+        <Avatar initials={c.initials} size="sm" />
         <div className="min-w-0">
-          <p className="truncate font-fraunces text-[15px] font-bold text-navy">{consultant.name}</p>
-          <p className="truncate text-xs text-text-muted">
-            {consultant.role} · {consultant.company}
+          <p className="flex items-center gap-1.5 text-sm font-semibold tracking-[-0.01em] text-ink">
+            <span className="truncate">{c.name}</span>
+            <ShieldCheck size={13} strokeWidth={1.5} className="shrink-0 text-muted" />
+          </p>
+          <p className="truncate text-[12.5px] text-muted">
+            {c.role} · {c.company}
           </p>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <Badge variant="sector">{consultant.sector}</Badge>
-        {consultant.tags.slice(0, 2).map((tag) => (
-          <span key={tag} className="rounded-full bg-warm-gray px-2.5 py-1 text-[11px] font-medium text-text-muted">
-            {tag}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-[7px]">
+        <Badge variant="sector">{c.sector}</Badge>
+        <Badge variant="tag">{c.focus[0]}</Badge>
       </div>
-      <Link
-        href={`/consultants/${consultant.id}`}
-        className="mt-4 block rounded-[10px] bg-amber py-2.5 text-center text-xs font-semibold text-white transition-all duration-[180ms] hover:scale-[1.02] hover:bg-amber-dark active:scale-[0.98]"
-      >
-        Book a Session
-      </Link>
+      <div className="flex items-center justify-between border-t border-line pt-3 text-[12.5px] text-muted">
+        <span>{c.experience} years experience</span>
+        <span className="flex items-center gap-1 text-ink">
+          <Star size={12} className="fill-ink text-ink" aria-hidden="true" />
+          {c.rating.toFixed(1)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -160,269 +94,159 @@ export default function LandingPage() {
   return (
     <>
       <Navbar />
-      <main>
+      <main className="mx-auto max-w-[1440px]">
         {/* ── Hero ─────────────────────────────────────────────── */}
-        <section className="grid lg:grid-cols-2">
-          <div className="flex items-center bg-cream px-5 py-16 md:px-12 lg:py-24">
-            <div className="mx-auto max-w-xl animate-fade-up lg:ml-auto lg:mr-16">
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-light px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.8px] text-amber-dark">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                Built for African Students
-              </span>
-              <h1 className="mt-6 font-fraunces text-[42px] font-black leading-[1.05] tracking-[-2px] text-navy md:text-[60px]">
-                Your career path starts <em className="italic text-amber">here</em>, not after.
-              </h1>
-              <p className="mt-6 max-w-md text-base leading-relaxed text-text-muted">
-                Connect with vetted industry professionals, discover your career path with AI
-                guidance, and access real-world opportunities — all while still in school.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href="/explore"
-                  className="inline-flex h-[52px] items-center rounded-[10px] bg-amber px-8 text-[15px] font-semibold text-white shadow-[0_4px_14px_rgba(232,160,32,0.35)] transition-all duration-[180ms] hover:scale-[1.02] hover:bg-amber-dark active:scale-[0.98]"
-                >
-                  Find a Consultant
-                </Link>
-                <Link
-                  href="/discover"
-                  className="inline-flex h-[52px] items-center rounded-[10px] border border-black/10 px-8 text-[15px] font-semibold text-text-main transition-all duration-[180ms] hover:scale-[1.02] hover:border-amber hover:text-amber-dark active:scale-[0.98]"
-                >
-                  Discover Your Path →
-                </Link>
-              </div>
-              <div className="mt-10 flex items-center gap-4">
-                <div className="flex -space-x-3">
-                  {heroAvatars.map((a) => (
-                    <Avatar
-                      key={a.initials}
-                      initials={a.initials}
-                      color={a.color}
-                      size="sm"
-                      className="ring-2 ring-cream"
-                    />
-                  ))}
-                </div>
-                <p className="max-w-[260px] text-[13px] leading-snug text-text-muted">
-                  500+ students already building their careers across Nigeria, Rwanda &amp; beyond
-                </p>
-              </div>
+        <section className="grid items-center gap-12 px-5 py-16 md:px-10 lg:grid-cols-2 lg:py-24">
+          <div className="max-w-xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-line px-3.5 py-1.5 text-micro font-semibold uppercase text-muted">
+              <span className="h-1.5 w-1.5 rounded-full bg-available" aria-hidden="true" />
+              Built for African students
+            </span>
+            <h1 className="mt-6 text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-ink md:text-[56px]">
+              Your career path starts here, not after.
+            </h1>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
+              Vetted professionals across Africa, giving free sessions to students. Find your
+              direction, then talk to someone already working in it.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/explore"
+                className="rounded bg-ink-soft px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-black"
+              >
+                Find a consultant
+              </Link>
+              <Link
+                href="/discover"
+                className="rounded border border-line px-6 py-3.5 text-sm font-medium text-ink transition-colors hover:bg-surface"
+              >
+                Discover your path
+              </Link>
             </div>
+            <p className="mt-9 text-[13px] leading-relaxed text-faint">
+              500+ students already building their careers across Nigeria, Rwanda &amp; beyond.
+            </p>
           </div>
 
-          <div className="relative overflow-hidden bg-navy px-5 py-16 md:px-12 lg:py-24">
-            <div
-              className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber/10"
-              aria-hidden="true"
-            />
-            <div
-              className="pointer-events-none absolute -bottom-32 left-8 h-80 w-80 rounded-full bg-amber/[0.06]"
-              aria-hidden="true"
-            />
-            <div className="relative mx-auto flex max-w-md flex-col items-center gap-6 lg:mr-auto lg:ml-16">
-              <div className="animate-fade-up self-start">
-                <HeroConsultantCard consultant={consultants[0]} />
-              </div>
-              <div className="animate-fade-up self-end [animation-delay:150ms]">
-                <HeroConsultantCard consultant={consultants[1]} />
-              </div>
-              <div className="mt-4 grid w-full animate-fade-up grid-cols-3 gap-3 [animation-delay:300ms]">
-                {[
-                  ['120+', 'Vetted Consultants'],
-                  ['3', 'Sectors'],
-                  ['Free', 'to Start'],
-                ].map(([value, label]) => (
-                  <div key={label} className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
-                    <p className="font-fraunces text-xl font-bold text-amber">{value}</p>
-                    <p className="mt-1 text-[11px] font-medium text-white/60">{label}</p>
-                  </div>
-                ))}
-              </div>
+          <div className="flex flex-col items-center gap-5 rounded-lg bg-surface p-8 md:p-12">
+            <div className="self-start">
+              <HeroConsultantCard consultant={consultants[0]} />
+            </div>
+            <div className="self-end">
+              <HeroConsultantCard consultant={consultants[1]} />
+            </div>
+            <div className="mt-2 grid w-full grid-cols-3 gap-3">
+              {[
+                ['120+', 'Vetted consultants'],
+                ['4', 'Sectors'],
+                ['Free', 'to start'],
+              ].map(([value, label]) => (
+                <div
+                  key={label}
+                  className="rounded-lg border border-line bg-white p-4 text-center"
+                >
+                  <p className="text-lg font-semibold tracking-[-0.02em] text-ink">{value}</p>
+                  <p className="mt-1 text-[11.5px] text-muted">{label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         {/* ── How it works ─────────────────────────────────────── */}
-        <section id="how-it-works" className="mx-auto max-w-[1200px] px-5 py-20 md:px-12 md:py-24">
-          <div className="flex items-center gap-3">
-            <span className="h-px w-10 bg-amber" />
-            <p className="text-xs font-semibold uppercase tracking-[0.8px] text-amber-dark">
-              How it works
-            </p>
-          </div>
-          <h2 className="mt-4 font-fraunces text-[32px] font-extrabold tracking-[-1.5px] text-navy md:text-[44px]">
+        <section id="how-it-works" className="border-t border-line px-5 py-20 md:px-10">
+          <p className="text-micro font-semibold uppercase text-faint">How it works</p>
+          <h2 className="mt-3 text-[30px] font-bold tracking-[-0.03em] text-ink md:text-[38px]">
             Three steps to career clarity
           </h2>
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {steps.map(({ number, icon: Icon, title, description }) => (
-              <div
-                key={number}
-                className="relative overflow-hidden rounded-xl border bg-white p-7 transition-all duration-200 hover:-translate-y-1 hover:border-amber/30 hover:shadow-card-hover"
-              >
-                <span className="pointer-events-none absolute -right-2 -top-5 font-fraunces text-[96px] font-black text-black/[0.04]">
-                  {number}
-                </span>
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-light text-amber-dark">
-                  <Icon size={22} />
-                </span>
-                <h3 className="mt-5 font-fraunces text-xl font-bold text-navy">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-text-muted">{description}</p>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            {steps.map(({ number, title, description }) => (
+              <div key={number} className="rounded-lg border border-line p-[22px]">
+                <span className="text-[13px] font-semibold tabular-nums text-faint">{number}</span>
+                <h3 className="mt-4 text-lg font-semibold tracking-[-0.01em] text-ink">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* ── Sectors ──────────────────────────────────────────── */}
-        <section className="bg-navy py-20 md:py-24">
-          <div className="mx-auto max-w-[1200px] px-5 md:px-12">
-            <h2 className="font-fraunces text-[32px] font-extrabold tracking-[-1.5px] text-white md:text-[44px]">
-              Three sectors. Real professionals.
-            </h2>
-            <p className="mt-3 max-w-xl text-[15px] text-white/60">
-              Every consultant works in the industry today — no theorists, no career coaches who
-              have never done the job.
-            </p>
-            <div className="mt-12 grid gap-6 md:grid-cols-3">
-              {sectors.map(({ icon: Icon, name, description, count }) => (
+        <section className="border-t border-line px-5 py-20 md:px-10">
+          <h2 className="text-[30px] font-bold tracking-[-0.03em] text-ink md:text-[38px]">
+            Four sectors. Real professionals.
+          </h2>
+          <p className="mt-2.5 max-w-xl text-base leading-relaxed text-muted">
+            Every consultant works in the industry today — no theorists, no career coaches who have
+            never done the job.
+          </p>
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {SECTORS.map((name) => {
+              const count = consultants.filter((c) => c.sector === name).length;
+              return (
                 <Link
                   key={name}
                   href="/explore"
-                  className="group rounded-xl border border-white/10 bg-white/5 p-7 transition-all duration-200 hover:-translate-y-1 hover:border-amber"
+                  className="flex flex-col rounded-lg border border-line p-[22px] transition-colors hover:border-faint/40"
                 >
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber/15 text-amber">
-                    <Icon size={22} />
-                  </span>
-                  <h3 className="mt-5 font-fraunces text-xl font-bold text-white">{name}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-white/60">{description}</p>
-                  <p className="mt-5 text-xs font-semibold uppercase tracking-[0.8px] text-amber">
-                    {count} →
+                  <h3 className="text-lg font-semibold tracking-[-0.01em] text-ink">{name}</h3>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">
+                    {sectorBlurbs[name]}
+                  </p>
+                  <p className="mt-5 text-[13px] text-faint">
+                    {count} consultant{count === 1 ? '' : 's'} →
                   </p>
                 </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Features + AI chat mockup ────────────────────────── */}
-        <section id="about" className="mx-auto max-w-[1200px] px-5 py-20 md:px-12 md:py-24">
-          <div className="grid items-center gap-14 lg:grid-cols-2">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="h-px w-10 bg-amber" />
-                <p className="text-xs font-semibold uppercase tracking-[0.8px] text-amber-dark">
-                  Why Pathora
-                </p>
-              </div>
-              <h2 className="mt-4 font-fraunces text-[32px] font-extrabold tracking-[-1.5px] text-navy md:text-[40px]">
-                Everything between confusion and your first offer
-              </h2>
-              <ul className="mt-10 space-y-7">
-                {features.map(({ icon: Icon, title, description }) => (
-                  <li key={title} className="flex gap-4">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-amber-light text-amber-dark">
-                      <Icon size={20} />
-                    </span>
-                    <div>
-                      <h3 className="font-fraunces text-lg font-bold text-navy">{title}</h3>
-                      <p className="mt-1 text-sm leading-relaxed text-text-muted">{description}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border bg-white p-6 shadow-card md:p-7">
-              <div className="flex items-center gap-3 border-b pb-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber text-lg text-white">
-                  ✦
-                </span>
-                <div>
-                  <p className="font-fraunces text-[15px] font-bold text-navy">Career Guide</p>
-                  <p className="inline-flex items-center gap-1.5 text-xs font-medium text-forest">
-                    <span className="h-1.5 w-1.5 rounded-full bg-forest" /> Online
-                  </p>
-                </div>
-              </div>
-              <div className="mt-5 space-y-3">
-                {chatMessages.map((m, i) => (
-                  <div key={i} className={`flex ${m.from === 'student' ? 'justify-end' : ''}`}>
-                    <p
-                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                        m.from === 'ai'
-                          ? 'rounded-tl-sm bg-warm-gray text-text-main'
-                          : 'rounded-tr-sm bg-navy text-white'
-                      }`}
-                    >
-                      {m.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-5 rounded-xl bg-amber-light p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.8px] text-amber-dark">
-                  Your career matches
-                </p>
-                <ul className="mt-3 space-y-2">
-                  {['Product Design', 'Product Management', 'Frontend Engineering'].map((match) => (
-                    <li key={match} className="flex items-center gap-2 text-sm font-medium text-text-main">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber" />
-                      {match}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </section>
 
         {/* ── Testimonials ─────────────────────────────────────── */}
-        <section className="bg-warm-gray py-20 md:py-24">
-          <div className="mx-auto max-w-[1200px] px-5 md:px-12">
-            <h2 className="text-center font-fraunces text-[32px] font-extrabold tracking-[-1.5px] text-navy md:text-[40px]">
-              Students are already ahead
-            </h2>
-            <div className="mt-12 grid gap-6 md:grid-cols-3">
-              {testimonials.map((t) => (
-                <figure key={t.name} className="rounded-xl border bg-white p-7">
-                  <div className="flex gap-1" aria-label="5 star rating">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} size={15} className="fill-amber text-amber" />
-                    ))}
+        <section id="about" className="border-t border-line px-5 py-20 md:px-10">
+          <h2 className="text-[30px] font-bold tracking-[-0.03em] text-ink md:text-[38px]">
+            Students are already ahead
+          </h2>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
+            {testimonials.map((t) => (
+              <figure key={t.name} className="rounded-lg border border-line p-[22px]">
+                <div className="flex gap-1" aria-label="5 out of 5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} size={13} className="fill-ink text-ink" aria-hidden="true" />
+                  ))}
+                </div>
+                <blockquote className="mt-4 text-[15px] leading-relaxed text-ink">
+                  {t.quote}
+                </blockquote>
+                <figcaption className="mt-5 flex items-center gap-3">
+                  <Avatar initials={t.initials} size="sm" />
+                  <div>
+                    <p className="text-sm font-medium text-ink">{t.name}</p>
+                    <p className="text-[12.5px] text-muted">{t.role}</p>
                   </div>
-                  <blockquote className="mt-4 font-fraunces text-[15px] italic leading-relaxed text-text-main">
-                    “{t.quote}”
-                  </blockquote>
-                  <figcaption className="mt-5 flex items-center gap-3">
-                    <Avatar initials={t.initials} color={t.color} size="md" />
-                    <div>
-                      <p className="text-sm font-semibold text-navy">{t.name}</p>
-                      <p className="text-xs text-text-muted">{t.role}</p>
-                    </div>
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </section>
 
-        {/* ── CTA banner ───────────────────────────────────────── */}
-        <section className="bg-navy py-20 md:py-24">
-          <div className="mx-auto max-w-[1200px] px-5 text-center md:px-12">
-            <h2 className="mx-auto max-w-3xl font-fraunces text-[32px] font-extrabold tracking-[-1.5px] text-white md:text-[48px]">
-              Stop guessing. Start asking people who{' '}
-              <em className="italic text-amber">already made it</em>.
+        {/* ── Closing CTA ──────────────────────────────────────── */}
+        <section className="px-5 pb-20 md:px-10">
+          <div className="on-dark flex flex-col items-start gap-8 rounded-lg bg-ink p-10 md:p-16">
+            <h2 className="max-w-2xl text-[30px] font-bold leading-[1.1] tracking-[-0.03em] text-white md:text-[42px]">
+              Stop guessing. Start asking people who already made it.
             </h2>
-            <div className="mt-10 flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap gap-3">
               <Link
                 href="/explore"
-                className="inline-flex h-[52px] items-center rounded-[10px] bg-amber px-8 text-[15px] font-semibold text-white transition-all duration-[180ms] hover:scale-[1.02] hover:bg-amber-dark active:scale-[0.98]"
+                className="rounded bg-white px-6 py-3.5 text-sm font-medium text-ink transition-colors hover:bg-white/90"
               >
-                Find a Consultant
+                Find a consultant
               </Link>
               <Link
                 href="/discover"
-                className="inline-flex h-[52px] items-center rounded-[10px] border border-white/30 px-8 text-[15px] font-semibold text-white transition-all duration-[180ms] hover:scale-[1.02] hover:bg-white/10 active:scale-[0.98]"
+                className="rounded border border-white/20 px-6 py-3.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
               >
-                Discover Your Path →
+                Discover your path
               </Link>
             </div>
           </div>

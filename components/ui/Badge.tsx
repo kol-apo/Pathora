@@ -1,15 +1,19 @@
 import type { ReactNode } from 'react';
 
-type Variant = 'sector' | 'type' | 'status-available' | 'status-busy' | 'match-strong' | 'match-good' | 'urgent';
+type Variant = 'sector' | 'sector-dark' | 'tag' | 'tag-dark' | 'label' | 'urgent';
 
 const variantClasses: Record<Variant, string> = {
-  sector: 'bg-amber-light text-amber-dark',
-  type: 'bg-forest-light text-forest',
-  'status-available': 'bg-forest-light text-forest',
-  'status-busy': 'bg-warm-gray text-text-muted',
-  'match-strong': 'bg-amber/20 text-amber-dark',
-  'match-good': 'bg-navy text-white',
-  urgent: 'bg-red-50 text-red-600',
+  /** Uppercase micro-label on a fill chip — used for sector. */
+  sector:
+    'bg-fill text-ink px-2.5 py-[5px] text-micro font-semibold uppercase',
+  'sector-dark':
+    'bg-white/[0.07] text-white/75 px-2.5 py-[5px] text-micro font-semibold uppercase',
+  /** Outlined chip for skills and focus areas. */
+  tag: 'border border-line text-muted px-2.5 py-1 text-[12.5px]',
+  'tag-dark': 'border border-white/[0.14] text-white/60 px-2.5 py-1 text-[12px]',
+  /** Bare uppercase label, no chip. */
+  label: 'text-muted text-micro font-semibold uppercase',
+  urgent: 'bg-fill text-ink px-2.5 py-[5px] text-micro font-semibold uppercase',
 };
 
 export default function Badge({
@@ -23,7 +27,7 @@ export default function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.8px] ${variantClasses[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full ${variantClasses[variant]} ${className}`}
     >
       {children}
     </span>

@@ -4,113 +4,112 @@ import StatCard from '@/components/dashboard/StatCard';
 import UpcomingSession from '@/components/dashboard/UpcomingSession';
 import ConsultantCardCompact from '@/components/consultant/ConsultantCardCompact';
 import OpportunityCard from '@/components/opportunities/OpportunityCard';
-import { consultants, currentStudent, opportunities } from '@/lib/data';
+import { currentStudent, featuredForSector, opportunities } from '@/lib/data';
+
+/** Bordered panel with a header row and a divided list of rows. */
+function Panel({
+  title,
+  href,
+  children,
+}: {
+  title: string;
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-line">
+      <div className="flex items-center justify-between border-b border-line px-5 py-[18px]">
+        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+        <Link href={href} className="text-[13px] text-muted transition-colors hover:text-ink">
+          View all
+        </Link>
+      </div>
+      <div className="flex flex-col divide-y divide-line">{children}</div>
+    </section>
+  );
+}
 
 export default function DashboardPage() {
   const student = currentStudent;
-  const recommended = consultants
-    .filter((c) => c.sector === student.matchedSector)
-    .slice(0, 3);
+  const recommended = featuredForSector(student.matchedSector, 3);
   const latestOpportunities = opportunities.slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-cream">
+    <div className="min-h-screen bg-white">
       <Sidebar />
-      <main className="px-5 pb-24 pt-8 md:px-10 lg:ml-60 lg:pb-12">
-        <div className="mx-auto max-w-5xl">
-          <header className="animate-fade-up">
-            <h1 className="font-fraunces text-[26px] font-bold text-navy md:text-[28px]">
-              Good morning, {student.name.split(' ')[0]} 👋
+
+      <main className="px-5 pb-24 pt-8 md:px-10 lg:ml-[248px] lg:pb-10">
+        <div className="mx-auto flex max-w-[1100px] flex-col gap-7">
+          <header>
+            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink md:text-[28px]">
+              Welcome back, {student.name.split(' ')[0]}
             </h1>
-            <p className="mt-1 text-[15px] text-text-muted">
-              Here&apos;s what&apos;s happening in your career journey.
+            <p className="mt-1.5 text-[15px] text-muted">
+              {student.field}, Year {student.year} · Career match: {student.careerMatch}
             </p>
           </header>
 
-          {/* Stats */}
-          <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard value={student.sessionsBooked} label="Sessions Booked" />
-            <StatCard value={student.consultantsExplored} label="Consultants Explored" />
-            <StatCard value={student.opportunitiesSaved} label="Opportunities Saved" />
-            <StatCard value={student.careerMatch} label="Career Match" />
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard value={student.sessionsBooked} label="Sessions booked" />
+            <StatCard value={student.consultantsExplored} label="Consultants explored" />
+            <StatCard value={student.opportunitiesSaved} label="Opportunities saved" />
+            <StatCard value={student.careerMatch} label="Career match" />
           </div>
 
-          {/* Upcoming session */}
-          <div className="mt-8">
-            <UpcomingSession session={student.upcomingSession} />
-          </div>
+          <UpcomingSession session={student.upcomingSession} />
 
-          {/* Recommended + opportunities */}
-          <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <section>
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <h2 className="font-fraunces text-xl font-bold text-navy">
-                    Recommended for You
-                  </h2>
-                  <p className="mt-1 text-[13px] text-text-muted">
-                    Based on your {student.careerMatch} match
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {recommended.map((c) => (
-                  <ConsultantCardCompact key={c.id} consultant={c} />
-                ))}
-              </div>
-              <Link
-                href="/explore"
-                className="mt-4 inline-block text-sm font-semibold text-amber-dark transition-colors hover:text-amber"
-              >
-                View all consultants →
-              </Link>
-            </section>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Panel title="Recommended for your path" href="/explore">
+              {recommended.map((c) => (
+                <ConsultantCardCompact key={c.id} consultant={c} />
+              ))}
+            </Panel>
 
-            <section id="opportunities">
-              <h2 className="font-fraunces text-xl font-bold text-navy">Latest Opportunities</h2>
-              <p className="mt-1 text-[13px] text-text-muted">
-                Curated for {student.matchedSector} and beyond
-              </p>
-              <div className="mt-4 space-y-3">
+            <div id="opportunities">
+              <Panel title="Latest opportunities" href="#opportunities">
                 {latestOpportunities.map((o) => (
                   <OpportunityCard key={o.id} opportunity={o} />
                 ))}
-              </div>
-              <Link
-                href="#opportunities"
-                className="mt-4 inline-block text-sm font-semibold text-amber-dark transition-colors hover:text-amber"
-              >
-                View all opportunities →
-              </Link>
-            </section>
+              </Panel>
+            </div>
           </div>
 
-          {/* Career path banner */}
-          <section className="mt-8 rounded-xl border-l-[6px] border-amber bg-amber-light p-6 md:p-7">
-            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="font-fraunces text-xl font-bold text-navy">
-                  Your career match: {student.careerMatch}
+          {/* Career path progress */}
+          <section className="flex flex-col gap-6 rounded-lg border border-line bg-surface p-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 flex-col gap-3.5 md:pr-8">
+              <div className="flex flex-col gap-1">
+                <h2 className="text-[15px] font-semibold text-ink">
+                  {student.careerMatch} path · Year {student.pathYear} of {student.pathYears}
                 </h2>
-                <p className="mt-1.5 text-sm font-medium text-amber-dark">
-                  Roadmap: Step 1 of 3 — building your foundations
+                <p className="text-[13.5px] text-muted">
+                  Foundations in progress — {student.milestonesDone} of {student.milestonesTotal}{' '}
+                  milestones done.
                 </p>
               </div>
-              <div className="flex items-center gap-5">
-                <Link
-                  href="/explore"
-                  className="inline-flex h-11 items-center rounded-[10px] bg-amber px-6 text-sm font-semibold text-white transition-all duration-[180ms] hover:scale-[1.02] hover:bg-amber-dark active:scale-[0.98]"
-                >
-                  Continue exploring
-                </Link>
-                <Link
-                  href="/discover"
-                  className="text-sm font-medium text-text-muted transition-colors hover:text-text-main"
-                >
-                  Retake assessment →
-                </Link>
+              <div
+                className="flex max-w-[420px] gap-1.5"
+                role="progressbar"
+                aria-valuenow={student.milestonesDone}
+                aria-valuemin={0}
+                aria-valuemax={student.milestonesTotal}
+                aria-label="Milestones completed"
+              >
+                {Array.from({ length: student.milestonesTotal }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1 flex-1 rounded-full ${
+                      i < student.milestonesDone ? 'bg-ink' : 'bg-line'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
+            <Link
+              href="/discover"
+              className="shrink-0 self-start rounded border border-line bg-white px-[18px] py-[11px] text-sm font-medium text-ink transition-colors hover:bg-surface md:self-auto"
+            >
+              View roadmap
+            </Link>
           </section>
         </div>
       </main>

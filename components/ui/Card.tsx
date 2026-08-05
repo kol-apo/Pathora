@@ -14,10 +14,8 @@ export default function Card({
 }: CardProps) {
   return (
     <div
-      className={`rounded-xl border bg-white ${padding ? 'p-6 md:p-7' : ''} ${
-        hover
-          ? 'transition-all duration-200 ease-out hover:-translate-y-1 hover:border-amber/30 hover:shadow-card-hover'
-          : ''
+      className={`rounded-lg border border-line bg-white ${padding ? 'p-[22px]' : ''} ${
+        hover ? 'transition-colors duration-150 hover:border-faint/40' : ''
       } ${className}`}
       {...rest}
     >

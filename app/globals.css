@@ -4,11 +4,21 @@
 
 @layer base {
   body {
-    @apply bg-cream text-text-main font-sans antialiased;
+    @apply bg-white text-ink font-sans antialiased;
   }
 
   ::selection {
-    background: rgba(232, 160, 32, 0.3);
+    background: rgba(17, 17, 17, 0.12);
+  }
+
+  /* Focus ring reads as ink on light surfaces, white on the dark session room. */
+  :focus-visible {
+    outline: 2px solid #111111;
+    outline-offset: 2px;
+  }
+
+  .on-dark :focus-visible {
+    outline-color: #ffffff;
   }
 }
 

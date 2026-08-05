@@ -1,6 +1,8 @@
 'use client';
 
-const sectors = ['All', 'Business', 'Finance', 'Technology'] as const;
+import { SECTORS } from '@/lib/types';
+
+const options = ['All', ...SECTORS] as const;
 
 export default function SectorFilter({
   active,
@@ -11,17 +13,17 @@ export default function SectorFilter({
 }) {
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by sector">
-      {sectors.map((sector) => {
+      {options.map((sector) => {
         const isActive = active === sector;
         return (
           <button
             key={sector}
             onClick={() => onChange(sector)}
             aria-pressed={isActive}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition-all duration-200 ${
+            className={`rounded-full px-4 py-[9px] text-[13.5px] font-medium transition-colors duration-150 ${
               isActive
-                ? 'border-amber bg-amber text-white'
-                : 'border-transparent bg-warm-gray text-text-muted hover:border-amber/50'
+                ? 'bg-ink-soft text-white'
+                : 'border border-line bg-white text-ink hover:bg-surface'
             }`}
           >
             {sector}

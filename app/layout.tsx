@@ -1,29 +1,30 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Fraunces } from 'next/font/google';
 import './globals.css';
 
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  style: ['normal', 'italic'],
-  variable: '--font-fraunces',
-});
-
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  variable: '--font-dm-sans',
-});
-
 export const metadata: Metadata = {
-  title: 'Pathora — Your career path starts here',
+  title: 'Pathora — Find your consultant',
   description:
-    'Connect with vetted industry professionals, discover your career path with AI guidance, and access real-world opportunities — built for African students.',
+    'Vetted professionals across Africa, giving free sessions to students. Browse by sector, book a video call.',
   icons: { icon: '/favicon.svg' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${fraunces.variable} ${dmSans.variable} font-sans`}>{children}</body>
+      <head>
+        {/*
+          Geist is not in this Next version's next/font/google registry, so it is
+          loaded the same way the design document loads it.
+        */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap"
+        />
+        <style>{`:root { --font-geist: 'Geist'; }`}</style>
+      </head>
+      <body className="font-sans">{children}</body>
     </html>
   );
 }

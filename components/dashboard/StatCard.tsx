@@ -1,10 +1,17 @@
 export default function StatCard({ value, label }: { value: string | number; label: string }) {
+  const isNumeric = typeof value === 'number';
   return (
-    <div className="rounded-xl bg-warm-gray p-5">
-      <p className="font-fraunces text-[32px] font-bold leading-none text-amber-dark">{value}</p>
-      <p className="mt-2 text-xs font-semibold uppercase tracking-[0.8px] text-text-muted">
-        {label}
-      </p>
+    <div className="flex flex-col gap-2 rounded-lg border border-line p-5">
+      <span className="text-[12.5px] text-muted">{label}</span>
+      <span
+        className={
+          isNumeric
+            ? 'text-[28px] font-semibold tracking-[-0.02em] text-ink'
+            : 'mt-1.5 text-[19px] font-semibold tracking-[-0.01em] text-ink'
+        }
+      >
+        {value}
+      </span>
     </div>
   );
 }

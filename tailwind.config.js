@@ -7,62 +7,56 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        navy: '#0F1F3D',
-        'navy-mid': '#1C3461',
-        amber: {
-          DEFAULT: '#E8A020',
-          light: '#FDF3E0',
-          dark: '#B87A10',
-        },
-        cream: '#FAFAF7',
-        'warm-gray': '#F5F3EE',
-        forest: {
-          DEFAULT: '#1A6B4A',
-          light: '#E6F4EE',
-        },
-        'text-main': '#1A1A1A',
-        'text-muted': '#6B6860',
-        'text-light': '#A09D96',
+        // Neutral scale — the whole system is built from these.
+        ink: '#111111',
+        'ink-soft': '#1A1A1A',
+        muted: '#6B6B6B',
+        faint: '#9B9B9B',
+        line: '#ECECEC',
+        fill: '#F4F4F4',
+        surface: '#FAFAFA',
+        canvas: '#EFEEEE',
+        // The only chromatic accent in the system: availability.
+        available: '#16A34A',
       },
       fontFamily: {
-        fraunces: ['var(--font-fraunces)', 'Fraunces', 'serif'],
-        sans: ['var(--font-dm-sans)', 'DM Sans', 'sans-serif'],
+        sans: ['var(--font-geist)', 'Geist', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+      fontSize: {
+        micro: ['11px', { lineHeight: '1.2', letterSpacing: '0.07em' }],
+        label: ['12.5px', { lineHeight: '1.4' }],
       },
       borderRadius: {
-        xl: '16px',
-        '2xl': '20px',
+        DEFAULT: '8px',
+        md: '10px',
+        lg: '12px',
       },
       borderColor: {
-        DEFAULT: 'rgba(0,0,0,0.08)',
+        DEFAULT: '#ECECEC',
       },
       boxShadow: {
-        card: '0 8px 24px rgba(15,31,61,0.06)',
-        'card-hover': '0 16px 40px rgba(15,31,61,0.10)',
-        modal: '0 20px 60px rgba(0,0,0,0.08)',
+        card: '0 2px 8px rgba(0,0,0,0.04)',
+        raised: '0 4px 16px rgba(0,0,0,0.06)',
       },
       keyframes: {
+        // The indeterminate sweep on the discovery "reviewing" screen.
+        bar: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(320%)' },
+        },
         'fade-up': {
-          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'fade-in': {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
         },
-        'slide-left': {
-          '0%': { opacity: '0', transform: 'translateX(32px)' },
-          '100%': { opacity: '1', transform: 'translateX(0)' },
-        },
-        'pulse-soft': {
-          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
-          '50%': { opacity: '0.55', transform: 'scale(0.9)' },
-        },
       },
       animation: {
-        'fade-up': 'fade-up 0.6s ease both',
-        'fade-in': 'fade-in 0.4s ease both',
-        'slide-left': 'slide-left 0.35s ease both',
-        'pulse-soft': 'pulse-soft 1.4s ease-in-out infinite',
+        bar: 'bar 1.6s ease-in-out infinite',
+        'fade-up': 'fade-up 0.45s ease both',
+        'fade-in': 'fade-in 0.3s ease both',
       },
     },
   },

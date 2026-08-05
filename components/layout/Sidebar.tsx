@@ -5,72 +5,75 @@ import {
   Briefcase,
   CalendarDays,
   Compass,
-  Home,
-  LogOut,
-  Search,
-  User,
+  LayoutDashboard,
+  Users,
 } from 'lucide-react';
-import { Logo } from './Navbar';
+import Avatar from '@/components/ui/Avatar';
+import { currentStudent } from '@/lib/data';
+import { Wordmark } from './Navbar';
 
 const items = [
-  { label: 'Home', href: '/dashboard', icon: Home, active: true },
-  { label: 'Find a Consultant', href: '/explore', icon: Search },
-  { label: 'Discover My Path', href: '/discover', icon: Compass },
+  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard, active: true },
+  { label: 'Consultants', href: '/explore', icon: Users },
+  { label: 'Career path', href: '/discover', icon: Compass },
   { label: 'Opportunities', href: '/dashboard#opportunities', icon: Briefcase },
-  { label: 'My Sessions', href: '/session/1', icon: CalendarDays },
-  { label: 'Profile', href: '#', icon: User },
+  { label: 'Sessions', href: '/session/1', icon: CalendarDays },
 ];
 
 export default function Sidebar() {
+  const student = currentStudent;
+
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r bg-white lg:flex">
-        <div className="px-6 py-6">
-          <Logo />
+      {/* Desktop rail */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-line bg-surface px-[18px] py-[26px] lg:flex">
+        <div className="px-2.5">
+          <Wordmark size={18} />
         </div>
-        <nav className="flex-1 space-y-1 px-3" aria-label="Dashboard">
+
+        <nav className="mt-[26px] flex flex-col gap-0.5" aria-label="Dashboard">
           {items.map(({ label, href, icon: Icon, active }) => (
             <Link
               key={label}
               href={href}
-              className={`flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-colors ${
+              aria-current={active ? 'page' : undefined}
+              className={`flex items-center gap-[11px] rounded p-2.5 text-sm transition-colors ${
                 active
-                  ? 'border-l-[3px] border-amber bg-amber-light/60 text-amber-dark'
-                  : 'text-text-muted hover:bg-warm-gray hover:text-text-main'
+                  ? 'bg-fill font-medium text-ink'
+                  : 'text-muted hover:bg-fill/60 hover:text-ink'
               }`}
             >
-              <Icon size={18} />
+              <Icon size={17} strokeWidth={1.5} className={active ? 'text-ink' : 'text-faint'} />
               {label}
             </Link>
           ))}
         </nav>
-        <div className="border-t px-3 py-4">
-          <Link
-            href="/"
-            className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-medium text-text-muted transition-colors hover:bg-red-50 hover:text-red-600"
-          >
-            <LogOut size={18} />
-            Sign Out
-          </Link>
+
+        <div className="mt-auto flex items-center gap-[11px] border-t border-line px-2.5 pb-2.5 pt-[18px]">
+          <Avatar initials={student.initials} size="xs" />
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-[13px] font-medium text-ink">{student.name}</span>
+            <span className="truncate text-[11.5px] text-faint">{student.university}</span>
+          </div>
         </div>
       </aside>
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile tab bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t bg-white py-2 lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-line bg-white py-2 lg:hidden"
         aria-label="Dashboard mobile"
       >
-        {items.slice(0, 5).map(({ label, href, icon: Icon, active }) => (
+        {items.map(({ label, href, icon: Icon, active }) => (
           <Link
             key={label}
             href={href}
+            aria-current={active ? 'page' : undefined}
             className={`flex flex-col items-center gap-1 px-2 py-1 text-[10px] font-medium ${
-              active ? 'text-amber-dark' : 'text-text-muted'
+              active ? 'text-ink' : 'text-faint'
             }`}
           >
-            <Icon size={20} />
-            {label.split(' ')[0]}
+            <Icon size={19} strokeWidth={1.5} />
+            {label}
           </Link>
         ))}
       </nav>
