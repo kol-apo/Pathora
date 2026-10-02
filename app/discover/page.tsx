@@ -11,52 +11,20 @@ import AnswerOption from '@/components/discover/AnswerOption';
 import ReviewingState from '@/components/discover/ReviewingState';
 import { PrimaryResultCard, SecondaryResultCard } from '@/components/discover/ResultCard';
 import BridgeSection from '@/components/discover/BridgeSection';
-import { careerProfiles, statusFragments } from '@/lib/data';
+import {
+  ENVIRONMENT_OPTIONS,
+  INTEREST_OPTIONS,
+  STATUS_OPTIONS,
+  STEP_LABELS,
+  STRENGTH_OPTIONS,
+  TOTAL_STEPS,
+  VISION_OPTIONS,
+  type DiscoveryAnswers,
+} from '@/lib/discovery/questions';
+import type { CareerMatch } from '@/lib/ai/schema';
 
-const TOTAL_STEPS = 6;
-
-const stepLabels = ['About you', 'Interests', 'Work style', 'Strengths', 'Vision', 'Context'];
-
-const statusOptions = [
-  "I have some ideas but I'm not sure which direction to go",
-  "I'm completely lost — and that's okay, I'm here to figure it out",
-  'I know what I want but need guidance on how to get there',
-  "I'm curious about my options before committing to anything",
-];
-
-const interestOptions = [
-  'Building and creating things',
-  'Working with numbers, data, and analysis',
-  'People, communication, and relationships',
-  'Technology, systems, and how things work',
-  'Business, markets, and strategy',
-  'Art, design, and aesthetics',
-  'Research, ideas, and learning',
-  'Leadership, influence, and impact',
-];
-
-const environmentOptions = [
-  'I like solving problems with logic and data',
-  'I like building things people actually use',
-  'I like understanding how markets and money work',
-  'I like leading, communicating, and persuading people',
-];
-
-const strengthOptions = [
-  'Explaining complex things in a simple way',
-  "Figuring out why something isn't working",
-  'Coming up with creative ideas',
-  'Getting things organised and delivered',
-  'Reading people and situations accurately',
-];
-
-const visionOptions = [
-  'Running my own company',
-  'Leading a team at a major organisation',
-  'Being the expert everyone calls on',
-  'Creating things that exist in the world',
-  'Making systems and institutions work better',
-];
+/** The reviewing screen is a spec requirement, so results never appear sooner. */
+const MIN_REVIEW_MS = 2500;
 
 type Phase = 'quiz' | 'reviewing' | 'results';
 
@@ -70,12 +38,55 @@ export default function DiscoverPage() {
   const [vision, setVision] = useState<number | null>(null);
   const [field, setField] = useState('');
   const [saveNudge, setSaveNudge] = useState(false);
+  const [match, setMatch] = useState<CareerMatch | null>(null);
 
-  // The reviewing interstitial always runs for 2.5s before results appear.
+  /**
+   * Run the discovery agent while the reviewing screen is shown, and wait for
+   * the animation's minimum duration as well as the request. A fast model must
+   * not skip the interstitial, and a slow one must not cut it short.
+   *
+   * The API never fails outright — it degrades to the offline match — so there
+   * is no error branch to strand the student in.
+   */
   useEffect(() => {
     if (phase !== 'reviewing') return;
-    const done = setTimeout(() => setPhase('results'), 2500);
-    return () => clearTimeout(done);
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const answers: DiscoveryAnswers = {
+      status: status ?? 0,
+      interests,
+      environment: environment ?? 0,
+      strength: strength ?? 0,
+      vision: vision ?? 0,
+      field: field.trim() || undefined,
+    };
+
+    const minimumWait = new Promise((resolve) => setTimeout(resolve, MIN_REVIEW_MS));
+
+    const request = fetch('/api/discovery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(answers),
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { result: CareerMatch }) => data.result)
+      .catch(() => null);
+
+    Promise.all([request, minimumWait]).then(([result]) => {
+      if (cancelled) return;
+      setMatch(result);
+      setPhase('results');
+    });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // Answers are fixed by the time this phase begins.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   const toggleInterest = (i: number) =>
@@ -108,23 +119,9 @@ export default function DiscoverPage() {
     setVision(null);
     setField('');
     setSaveNudge(false);
+    setMatch(null);
     window.scrollTo({ top: 0 });
   };
-
-  const profile = careerProfiles[environment ?? 1];
-  const interestList = interests
-    .slice(0, 3)
-    .map((i) => interestOptions[i].toLowerCase())
-    .join(', ');
-  const why = [
-    `You told us ${statusFragments[status ?? 0]}, and that you light up around ${interestList || 'new challenges'}.`,
-    field.trim()
-      ? `With your background in ${field.trim()}, this path builds on what you already know.`
-      : '',
-    profile.primary.why,
-  ]
-    .filter(Boolean)
-    .join(' ');
 
   /** The questionnaire and reviewing screens use a stripped-back header. */
   const quizHeader = (
@@ -149,15 +146,15 @@ export default function DiscoverPage() {
             <QuestionCard
               step={1}
               totalSteps={TOTAL_STEPS}
-              stepLabel={stepLabels[0]}
+              stepLabel={STEP_LABELS[0]}
               question="Where are you right now?"
               subtext="Start honestly — the rest of this only works if this answer is true."
             >
               <div className="grid gap-3">
-                {statusOptions.map((label, i) => (
+                {STATUS_OPTIONS.map((o, i) => (
                   <AnswerOption
-                    key={label}
-                    label={label}
+                    key={o.label}
+                    label={o.label}
                     selected={status === i}
                     onClick={() => setStatus(i)}
                   />
@@ -170,16 +167,16 @@ export default function DiscoverPage() {
             <QuestionCard
               step={2}
               totalSteps={TOTAL_STEPS}
-              stepLabel={stepLabels[1]}
+              stepLabel={STEP_LABELS[1]}
               question="What genuinely pulls your attention?"
               subtext="There is no wrong answer here. Pick everything that feels true, not what sounds impressive."
               hint="Select all that apply"
             >
               <div className="grid gap-3 sm:grid-cols-2">
-                {interestOptions.map((label, i) => (
+                {INTEREST_OPTIONS.map((o, i) => (
                   <AnswerOption
-                    key={label}
-                    label={label}
+                    key={o.label}
+                    label={o.label}
                     multi
                     selected={interests.includes(i)}
                     onClick={() => toggleInterest(i)}
@@ -193,14 +190,14 @@ export default function DiscoverPage() {
             <QuestionCard
               step={3}
               totalSteps={TOTAL_STEPS}
-              stepLabel={stepLabels[2]}
+              stepLabel={STEP_LABELS[2]}
               question="Which of these sounds most like you?"
             >
               <div className="grid gap-3">
-                {environmentOptions.map((label, i) => (
+                {ENVIRONMENT_OPTIONS.map((o, i) => (
                   <AnswerOption
-                    key={label}
-                    label={label}
+                    key={o.label}
+                    label={o.label}
                     selected={environment === i}
                     onClick={() => setEnvironment(i)}
                   />
@@ -213,14 +210,14 @@ export default function DiscoverPage() {
             <QuestionCard
               step={4}
               totalSteps={TOTAL_STEPS}
-              stepLabel={stepLabels[3]}
+              stepLabel={STEP_LABELS[3]}
               question="What do people come to you for?"
             >
               <div className="grid gap-3">
-                {strengthOptions.map((label, i) => (
+                {STRENGTH_OPTIONS.map((o, i) => (
                   <AnswerOption
-                    key={label}
-                    label={label}
+                    key={o.label}
+                    label={o.label}
                     selected={strength === i}
                     onClick={() => setStrength(i)}
                   />
@@ -233,14 +230,14 @@ export default function DiscoverPage() {
             <QuestionCard
               step={5}
               totalSteps={TOTAL_STEPS}
-              stepLabel={stepLabels[4]}
+              stepLabel={STEP_LABELS[4]}
               question="In ten years, which version of you sounds right?"
             >
               <div className="grid gap-3">
-                {visionOptions.map((label, i) => (
+                {VISION_OPTIONS.map((o, i) => (
                   <AnswerOption
-                    key={label}
-                    label={label}
+                    key={o.label}
+                    label={o.label}
                     selected={vision === i}
                     onClick={() => setVision(i)}
                   />
@@ -253,7 +250,7 @@ export default function DiscoverPage() {
             <QuestionCard
               step={6}
               totalSteps={TOTAL_STEPS}
-              stepLabel={stepLabels[5]}
+              stepLabel={STEP_LABELS[5]}
               question="Last one — what are you studying?"
               subtext="Optional, but it lets us tie the result back to what you already know."
               hint="Optional"
@@ -317,6 +314,31 @@ export default function DiscoverPage() {
     );
   }
 
+  // Only reachable if the network dropped entirely — the API itself always
+  // returns a result, degrading to the offline match rather than erroring.
+  if (!match) {
+    return (
+      <>
+        <Navbar />
+        <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-5 text-center">
+          <h1 className="text-2xl font-bold tracking-[-0.02em] text-ink">
+            We couldn&apos;t reach the guide
+          </h1>
+          <p className="mt-2.5 text-[15px] leading-relaxed text-muted">
+            Your answers are still here. Check your connection and try again.
+          </p>
+          <button
+            onClick={() => setPhase('reviewing')}
+            className="mt-6 rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+          >
+            Try again
+          </button>
+        </main>
+        <Footer />
+      </>
+    );
+  }
+
   // Results are a normal browsing surface, so they get the full site chrome.
   return (
     <>
@@ -333,22 +355,22 @@ export default function DiscoverPage() {
 
         <div className="mt-10">
           <PrimaryResultCard
-            match={profile.primary}
-            why={why}
-            africanMarket={profile.primary.africanMarket}
-            roadmap={profile.primary.roadmap}
+            match={match.primary}
+            why={match.primary.why}
+            africanMarket={match.primary.africanMarket}
+            roadmap={match.primary.roadmap}
           />
         </div>
 
         <div className="mt-5 grid gap-5 md:grid-cols-2">
-          {profile.secondary.map((match) => (
-            <SecondaryResultCard key={match.title} match={match} />
+          {match.secondary.map((s) => (
+            <SecondaryResultCard key={s.title} match={s} />
           ))}
         </div>
 
         {/* Every discovery result ends here — results always bridge to people. */}
         <div className="mt-16">
-          <BridgeSection sector={profile.primary.sector} />
+          <BridgeSection sector={match.primary.sector} />
         </div>
 
         <div className="mt-16 flex flex-col items-center gap-4 border-t border-line pt-10">

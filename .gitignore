@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Secrets — never commit real credentials. .env.example is the tracked template.
+.env
+.env.*
+!.env.example
+
 # Next.js
 .next
 out
