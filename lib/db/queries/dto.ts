@@ -29,6 +29,12 @@ export interface MentorDTO {
   ratingAvg: number;
   ratingCount: number;
   sessionCount: number;
+  /**
+   * Start of the soonest bookable slot (ISO, UTC), or null when nothing is
+   * open. Only present on reads that compute it — it is derived from the
+   * availability rules and live bookings, never stored.
+   */
+  nextSlotAt?: string | null;
 }
 
 export interface SlotDTO {

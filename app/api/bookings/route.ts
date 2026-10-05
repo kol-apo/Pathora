@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createBooking, listBookingsForStudent } from '@/lib/db/queries';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
+import { getDemoStudentId } from '@/lib/db/demo';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,15 +10,17 @@ export const dynamic = 'force-dynamic';
  * TEMPORARY: identity comes from the request until auth exists.
  *
  * Trusting a client-supplied studentId is not acceptable in production — it
- * would let anyone book as anyone. Replace this single function with a session
- * lookup when Auth.js lands; nothing else in this file changes.
+ * would let anyone book as anyone. With no id given, falls back to the seeded
+ * demo student (development only — see `getDemoStudentId`). Replace this single
+ * function with a session lookup when Auth.js lands; nothing else in this file
+ * changes.
  */
-function resolveStudentId(body: { studentId?: string }): string | null {
-  return body.studentId ?? null;
+async function resolveStudentId(body: { studentId?: string }): Promise<string | null> {
+  return body.studentId ?? (await getDemoStudentId());
 }
 
 const CreateSchema = z.object({
-  studentId: z.string().min(1),
+  studentId: z.string().min(1).optional(),
   mentorId: z.string().min(1),
   startsAt: z.coerce.date(),
   topic: z.string().trim().min(1).max(200),
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const studentId = resolveStudentId(parsed.data);
+  const studentId = await resolveStudentId(parsed.data);
   if (!studentId) {
     return NextResponse.json({ error: 'Sign in to book a session.' }, { status: 401 });
   }

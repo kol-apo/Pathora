@@ -53,7 +53,7 @@ export async function listMentors(
     MentorProfile.countDocuments(filter),
   ]);
 
-  return { mentors: docs.map(toMentorDTO), total };
+  return { mentors: await withNextSlots(docs.map(toMentorDTO)), total };
 }
 
 export async function getMentor(mentorId: string): Promise<MentorDTO | null> {
@@ -61,7 +61,57 @@ export async function getMentor(mentorId: string): Promise<MentorDTO | null> {
   await dbConnect();
 
   const doc = await MentorProfile.findById(mentorId).lean();
-  return doc ? toMentorDTO(doc) : null;
+  if (!doc) return null;
+  const [mentor] = await withNextSlots([toMentorDTO(doc)]);
+  return mentor;
+}
+
+/**
+ * Fill in `nextSlotAt` for a page of mentors.
+ *
+ * Runs the same slot generator the booking flow uses, so "Available this week"
+ * on a card can never disagree with what the picker then offers. Two queries
+ * for the whole page — availability and bookings fetched with `$in` — rather
+ * than two per mentor.
+ */
+async function withNextSlots(mentors: MentorDTO[], now = new Date()): Promise<MentorDTO[]> {
+  if (mentors.length === 0) return mentors;
+  const ids = mentors.map((m) => m.id);
+
+  const [allRules, bookings] = await Promise.all([
+    Availability.find({ mentor: { $in: ids } }).lean(),
+    Booking.find({
+      mentor: { $in: ids },
+      active: true,
+      // A day of slack so a session that began yesterday and runs past now
+      // still counts as busy.
+      endsAt: { $gte: new Date(now.getTime() - 86_400_000) },
+    })
+      .select('mentor startsAt endsAt')
+      .lean(),
+  ]);
+
+  const rulesByMentor = new Map(allRules.map((r) => [String(r.mentor), r]));
+  const busyByMentor = new Map<string, BusyInterval[]>();
+  for (const b of bookings) {
+    const key = String(b.mentor);
+    const list = busyByMentor.get(key) ?? [];
+    list.push({ startsAt: new Date(b.startsAt), endsAt: new Date(b.endsAt) });
+    busyByMentor.set(key, list);
+  }
+
+  return mentors.map((m) => {
+    const rules = rulesByMentor.get(m.id);
+    if (!m.acceptingBookings || !rules) return { ...m, nextSlotAt: null };
+
+    const [first] = generateSlots({
+      rules,
+      timeZone: m.timezone,
+      now,
+      busy: busyByMentor.get(m.id) ?? [],
+    });
+    return { ...m, nextSlotAt: first ? first.startsAt.toISOString() : null };
+  });
 }
 
 /** Mentors in a sector, topped up from others so callers always get `count`. */

@@ -1,48 +1,101 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, Check, ShieldCheck, Star } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, Star } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import Avatar from '@/components/ui/Avatar';
 import Badge from '@/components/ui/Badge';
-import Button from '@/components/ui/Button';
 import { ToastStack, type ToastData } from '@/components/ui/Toast';
 import ConsultantCard from '@/components/consultant/ConsultantCard';
-import { consultants, getConsultant } from '@/lib/data';
+import BookingPanel from '@/components/consultant/BookingPanel';
+import { toConsultant } from '@/lib/mentors';
+import type { MentorDTO } from '@/lib/db/queries/dto';
+import type { Consultant } from '@/lib/types';
 
-/** Previous roles for the experience timeline — one step back per consultant. */
+/**
+ * Previous roles for the experience timeline — one step back per consultant.
+ *
+ * Still sample content: the mentor model has no work-history field yet. Keyed
+ * by name because database ids are not known ahead of time.
+ */
 const previousRoles: Record<string, { role: string; company: string; years: string }> = {
-  '1': { role: 'Product Manager', company: 'Flutterwave', years: '2018 – 2021' },
-  '2': { role: 'Audit Associate', company: 'KPMG Nigeria', years: '2020 – 2022' },
-  '3': { role: 'Junior Developer', company: 'Andela', years: '2021 – 2023' },
-  '4': { role: 'Brand Manager', company: 'Unilever West Africa', years: '2016 – 2020' },
-  '5': { role: 'Graduate Trainee', company: 'PwC Nigeria', years: '2019 – 2021' },
-  '6': { role: 'Senior Designer', company: 'Big Cabal Media', years: '2018 – 2022' },
-  '7': { role: 'Operations Lead', company: 'Farmcrowdy', years: '2017 – 2019' },
-  '8': { role: 'Video Editor', company: 'Zikoko', years: '2020 – 2023' },
+  'Taiwo Adeyemi': { role: 'Product Manager', company: 'Flutterwave', years: '2018 – 2021' },
+  'Nkechi Okafor': { role: 'Audit Associate', company: 'KPMG Nigeria', years: '2020 – 2022' },
+  'Chidi Eze': { role: 'Junior Developer', company: 'Andela', years: '2021 – 2023' },
+  'Amara Diallo': { role: 'Brand Manager', company: 'Unilever West Africa', years: '2016 – 2020' },
+  'Fatima Al-Hassan': { role: 'Graduate Trainee', company: 'PwC Nigeria', years: '2019 – 2021' },
+  'Zainab Mensah': { role: 'Senior Designer', company: 'Big Cabal Media', years: '2018 – 2022' },
+  'Tunde Bakare': { role: 'Operations Lead', company: 'Farmcrowdy', years: '2017 – 2019' },
+  'David Okoro': { role: 'Video Editor', company: 'Zikoko', years: '2020 – 2023' },
 };
 
+type LoadState = 'loading' | 'ready' | 'not-found' | 'error';
+
+async function getMentors(query: string): Promise<Consultant[]> {
+  const res = await fetch(`/api/mentors?${query}`);
+  if (!res.ok) return [];
+  const data: { mentors: MentorDTO[] } = await res.json();
+  return data.mentors.map(toConsultant);
+}
+
 export default function ConsultantProfilePage({ params }: { params: { id: string } }) {
-  const consultant = getConsultant(params.id) ?? consultants[0];
-  const [booked, setBooked] = useState(false);
+  const [consultant, setConsultant] = useState<Consultant | null>(null);
+  const [related, setRelated] = useState<Consultant[]>([]);
+  const [load, setLoad] = useState<LoadState>('loading');
+  const [attempt, setAttempt] = useState(0);
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
-  const available = consultant.nextSlot === null;
-  const previous = previousRoles[consultant.id];
-  const related = consultants
-    .filter((c) => c.sector === consultant.sector && c.id !== consultant.id)
-    .concat(consultants.filter((c) => c.sector !== consultant.sector && c.id !== consultant.id))
-    .slice(0, 3);
+  useEffect(() => {
+    let cancelled = false;
+    setLoad('loading');
 
-  const handleBook = () => {
-    setBooked(true);
-    setToasts((prev) => [
-      ...prev,
-      { id: Date.now(), message: `Session with ${consultant.name} requested` },
-    ]);
-  };
+    fetch(`/api/mentors/${params.id}`)
+      .then(async (res) => {
+        // 400 is a malformed id — to a student that is simply "not found".
+        if (res.status === 404 || res.status === 400) return 'not-found' as const;
+        if (!res.ok) throw new Error(String(res.status));
+        const data: { mentor: MentorDTO } = await res.json();
+        return toConsultant(data.mentor);
+      })
+      .then(async (result) => {
+        if (cancelled) return;
+        if (result === 'not-found') {
+          setLoad('not-found');
+          return;
+        }
+        setConsultant(result);
+        setLoad('ready');
+
+        // Same sector first, topped up from other sectors so there are always three.
+        const others = (list: Consultant[]) => list.filter((c) => c.id !== result.id);
+        let picks = others(await getMentors(`sector=${encodeURIComponent(result.sector)}&limit=4`));
+        if (picks.length < 3) {
+          const rest = others(await getMentors('limit=8')).filter((c) => c.sector !== result.sector);
+          picks = picks.concat(rest);
+        }
+        if (!cancelled) setRelated(picks.slice(0, 3));
+      })
+      .catch(() => {
+        if (!cancelled) setLoad('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, attempt]);
+
+  const handleBooked = useCallback(
+    (message: string) => setToasts((prev) => [...prev, { id: Date.now(), message }]),
+    [],
+  );
+
+  if (load !== 'ready' || !consultant) {
+    return <ProfileFallback state={load} onRetry={() => setAttempt((n) => n + 1)} />;
+  }
+
+  const previous = previousRoles[consultant.name];
 
   return (
     <>
@@ -160,73 +213,96 @@ export default function ConsultantProfilePage({ params }: { params: { id: string
           </div>
 
           {/* ── Booking card ────────────────────────────────── */}
-          <aside>
-            <div className="sticky top-[92px] rounded-lg border border-line p-[22px]">
-              <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">
-                Book a free session
-              </h2>
-              <p className="mt-2 text-[13.5px] text-muted">
-                1:1 video session · 45 minutes · Free
-              </p>
-              <p className="mt-3 flex items-center gap-[7px] text-[13px]">
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${available ? 'bg-available' : 'bg-faint'}`}
-                  aria-hidden="true"
-                />
-                <span className={available ? 'text-available' : 'text-muted'}>
-                  {available ? 'Available this week' : `Next slot ${consultant.nextSlot}`}
-                </span>
-              </p>
-
-              <div className="mt-5 flex h-36 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface text-faint">
-                <CalendarDays size={24} strokeWidth={1.5} />
-                <p className="text-[12.5px]">Session scheduling loads here</p>
-              </div>
-
-              {booked ? (
-                <div className="mt-5 rounded-lg bg-surface p-4 text-center">
-                  <p className="inline-flex items-center gap-2 text-sm font-medium text-ink">
-                    <Check size={16} strokeWidth={2} className="text-available" />
-                    Session requested
-                  </p>
-                  <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-                    {consultant.name.split(' ')[0]} will confirm within 24 hours.{' '}
-                    <Link
-                      href="/dashboard"
-                      className="font-medium text-ink underline underline-offset-2"
-                    >
-                      View in dashboard
-                    </Link>
-                  </p>
-                </div>
-              ) : (
-                <Button size="lg" fullWidth className="mt-5" onClick={handleBook}>
-                  Book a Session
-                </Button>
-              )}
-
-              <p className="mt-4 flex items-center justify-center gap-2 border-t border-line pt-4 text-[12.5px] text-muted">
-                <ShieldCheck size={13} strokeWidth={1.5} className="text-faint" />
-                Reviewed and approved by the Pathora team
-              </p>
-            </div>
+          <aside className="min-w-0">
+            <BookingPanel consultant={consultant} onBooked={handleBooked} />
           </aside>
         </div>
 
         {/* ── Related ───────────────────────────────────────── */}
-        <section className="mt-16 border-t border-line pt-10">
-          <h2 className="text-[26px] font-bold tracking-[-0.03em] text-ink">
-            More consultants in {consultant.sector}
-          </h2>
-          <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {related.map((c) => (
-              <ConsultantCard key={c.id} consultant={c} />
-            ))}
-          </div>
-        </section>
+        {related.length > 0 && (
+          <section className="mt-16 border-t border-line pt-10">
+            <h2 className="text-[26px] font-bold tracking-[-0.03em] text-ink">
+              More consultants in {consultant.sector}
+            </h2>
+            <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {related.map((c) => (
+                <ConsultantCard key={c.id} consultant={c} />
+              ))}
+            </div>
+          </section>
+        )}
       </main>
       <Footer />
       <ToastStack toasts={toasts} onClose={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
+    </>
+  );
+}
+
+/** Loading, missing and failed states — each with a way forward. */
+function ProfileFallback({ state, onRetry }: { state: LoadState; onRetry: () => void }) {
+  return (
+    <>
+      <Navbar />
+      <main className="mx-auto max-w-[1440px] px-5 pb-20 pt-8 md:px-10">
+        <Link
+          href="/explore"
+          className="inline-flex items-center gap-2 text-sm text-muted transition-colors hover:text-ink"
+        >
+          <ArrowLeft size={15} strokeWidth={1.5} />
+          Back to consultants
+        </Link>
+
+        {state === 'loading' ? (
+          <div
+            className="mt-8 grid animate-pulse gap-10 lg:grid-cols-[1fr_380px]"
+            aria-busy="true"
+            aria-label="Loading consultant"
+          >
+            <div>
+              <div className="flex items-center gap-5">
+                <div className="h-14 w-14 rounded-lg bg-fill" />
+                <div className="flex flex-col gap-2.5">
+                  <div className="h-8 w-56 rounded bg-fill" />
+                  <div className="h-4 w-40 rounded bg-fill" />
+                </div>
+              </div>
+              <div className="mt-8 h-4 w-full max-w-2xl rounded bg-fill" />
+              <div className="mt-2.5 h-4 w-4/5 max-w-2xl rounded bg-fill" />
+              <div className="mt-2.5 h-4 w-3/5 max-w-2xl rounded bg-fill" />
+            </div>
+            <div className="h-[340px] rounded-lg border border-line" />
+          </div>
+        ) : (
+          <div className="mx-auto max-w-sm py-24 text-center">
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">
+              {state === 'not-found'
+                ? 'This consultant isn’t available'
+                : 'We couldn’t load this consultant'}
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              {state === 'not-found'
+                ? 'The profile may have moved. Plenty of others are taking sessions.'
+                : 'Check your connection and try again.'}
+            </p>
+            {state === 'not-found' ? (
+              <Link
+                href="/explore"
+                className="mt-6 inline-block rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+              >
+                Browse all consultants
+              </Link>
+            ) : (
+              <button
+                onClick={onRetry}
+                className="mt-6 rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+              >
+                Try again
+              </button>
+            )}
+          </div>
+        )}
+      </main>
+      <Footer />
     </>
   );
 }

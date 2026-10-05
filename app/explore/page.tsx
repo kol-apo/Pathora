@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, Search } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
@@ -8,7 +8,9 @@ import Footer from '@/components/layout/Footer';
 import Input from '@/components/ui/Input';
 import ConsultantCard from '@/components/consultant/ConsultantCard';
 import SectorFilter from '@/components/consultant/SectorFilter';
-import { consultants } from '@/lib/data';
+import { toConsultant } from '@/lib/mentors';
+import type { MentorDTO } from '@/lib/db/queries/dto';
+import type { Consultant } from '@/lib/types';
 
 type SortKey = 'experience' | 'rating' | 'booked';
 
@@ -20,33 +22,58 @@ const sortLabels: Record<SortKey, string> = {
 
 const PAGE_SIZE = 6;
 
+type LoadState = 'loading' | 'ready' | 'error';
+
 export default function ExplorePage() {
   const [query, setQuery] = useState('');
   const [sector, setSector] = useState('All');
   const [sort, setSort] = useState<SortKey>('experience');
   const [showAll, setShowAll] = useState(false);
+  const [consultants, setConsultants] = useState<Consultant[]>([]);
+  const [load, setLoad] = useState<LoadState>('loading');
+  const [attempt, setAttempt] = useState(0);
 
+  /**
+   * Sector and sort are applied by the database: each change asks the API for
+   * that slice, already ordered. The abort stops a slow earlier response from
+   * landing after a newer one and showing the wrong sector.
+   */
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ sort, limit: '100' });
+    if (sector !== 'All') params.set('sector', sector);
+
+    setLoad('loading');
+    fetch(`/api/mentors?${params}`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
+      .then((data: { mentors: MentorDTO[] }) => {
+        setConsultants(data.mentors.map(toConsultant));
+        setLoad('ready');
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setLoad('error');
+      });
+
+    return () => controller.abort();
+  }, [sector, sort, attempt]);
+
+  /**
+   * Search runs over the loaded slice in the browser. MongoDB's text index only
+   * matches whole words, so typing "fin" would stop matching "Finance" — this
+   * keeps the as-you-type behaviour students expect.
+   */
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const matches = consultants.filter((c) => {
-      const inSector = sector === 'All' || c.sector === sector;
-      const inQuery =
-        q === '' ||
+    if (q === '') return consultants;
+    return consultants.filter(
+      (c) =>
         c.name.toLowerCase().includes(q) ||
         c.role.toLowerCase().includes(q) ||
         c.company.toLowerCase().includes(q) ||
         c.focus.some((f) => f.toLowerCase().includes(q)) ||
-        c.tags.some((t) => t.toLowerCase().includes(q));
-      return inSector && inQuery;
-    });
-    return [...matches].sort((a, b) =>
-      sort === 'experience'
-        ? b.experience - a.experience
-        : sort === 'rating'
-          ? b.rating - a.rating
-          : b.sessions - a.sessions,
+        c.tags.some((t) => t.toLowerCase().includes(q)),
     );
-  }, [query, sector, sort]);
+  }, [consultants, query]);
 
   const visible = showAll ? filtered : filtered.slice(0, PAGE_SIZE);
   const remaining = filtered.length - visible.length;
@@ -118,12 +145,41 @@ export default function ExplorePage() {
               }}
             />
             <p className="text-[13.5px] text-muted" aria-live="polite">
-              {filtered.length} consultant{filtered.length === 1 ? '' : 's'}
+              {load === 'ready'
+                ? `${filtered.length} consultant${filtered.length === 1 ? '' : 's'}`
+                : load === 'loading'
+                  ? 'Loading…'
+                  : ''}
             </p>
           </div>
         </div>
 
-        {filtered.length > 0 ? (
+        {load === 'loading' ? (
+          <div
+            className="grid gap-5 px-5 pb-14 pt-6 md:grid-cols-2 md:px-10 lg:grid-cols-3"
+            aria-busy="true"
+            aria-label="Loading consultants"
+          >
+            {Array.from({ length: PAGE_SIZE }, (_, i) => (
+              <ConsultantCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : load === 'error' ? (
+          <div className="mx-auto max-w-sm px-5 py-24 text-center">
+            <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">
+              We couldn&apos;t load consultants
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={() => setAttempt((n) => n + 1)}
+              className="mt-6 rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+            >
+              Try again
+            </button>
+          </div>
+        ) : filtered.length > 0 ? (
           <>
             <div
               className={`grid gap-5 px-5 pt-6 md:grid-cols-2 md:px-10 lg:grid-cols-3 ${
@@ -186,5 +242,27 @@ export default function ExplorePage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+/** Same outline as ConsultantCard, so the grid does not jump when data lands. */
+function ConsultantCardSkeleton() {
+  return (
+    <div className="flex animate-pulse flex-col gap-4 rounded-lg border border-line p-[22px]">
+      <div className="flex items-center gap-3.5">
+        <div className="h-14 w-14 shrink-0 rounded-lg bg-fill" />
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="h-4 w-2/5 rounded bg-fill" />
+          <div className="h-3.5 w-3/5 rounded bg-fill" />
+        </div>
+      </div>
+      <div className="flex gap-[7px]">
+        <div className="h-6 w-24 rounded-full bg-fill" />
+        <div className="h-6 w-20 rounded-full bg-fill" />
+      </div>
+      <div className="h-px bg-line" />
+      <div className="h-3.5 w-1/3 rounded bg-fill" />
+      <div className="h-[42px] rounded bg-fill" />
+    </div>
   );
 }

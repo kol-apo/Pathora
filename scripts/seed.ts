@@ -19,16 +19,9 @@ import {
   User,
 } from '../lib/db/models';
 import { consultants, currentStudent, opportunities } from '../lib/data';
+import { DEMO_STUDENT_EMAIL, slug } from '../lib/db/demo';
 
 const fresh = process.argv.includes('--fresh');
-
-const slug = (name: string) =>
-  name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z]+/g, '.')
-    .replace(/^\.|\.$/g, '');
 
 /** "14 Sep" -> a Date this year, rolled to next year if already past. */
 function parseDeadline(text: string): Date | null {
@@ -162,7 +155,7 @@ async function main() {
   console.log(`seeded ${mentorCount} mentors with availability`);
 
   // ── Student ───────────────────────────────────────────────────────────────
-  const studentEmail = `${slug(currentStudent.name)}@pathora.test`;
+  const studentEmail = DEMO_STUDENT_EMAIL;
   const studentUser = await User.findOneAndUpdate(
     { email: studentEmail },
     { $set: { name: currentStudent.name, role: 'student', emailVerified: new Date() } },
