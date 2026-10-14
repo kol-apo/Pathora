@@ -1,3 +1,29 @@
+# Secrets: never commit real credentials. .env.example is the tracked template.
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+service-account*.json
+
+# Dependencies and build output
+node_modules
+.next
+out
+dist
+dist-ssr
+build
+coverage
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
+
 # Logs
 logs
 *.log
@@ -7,25 +33,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-
-# Secrets — never commit real credentials. .env.example is the tracked template.
-.env
-.env.*
-!.env.example
-
-# Next.js
-.next
-out
-next-env.d.ts
-*.tsbuildinfo
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+# Editor and OS files
+.vscode
 .idea
 .DS_Store
 *.suo
@@ -33,3 +42,15 @@ next-env.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+# -----------------------------------------------------------------------------
+# Ethics: participant data must never enter version control.
+# Required by the data management plan in the ethics application. Research data
+# lives only in the approved storage location, never in this repository.
+# -----------------------------------------------------------------------------
+data/
+responses/
+participants/
+consent/
+*.csv
+*.xlsx

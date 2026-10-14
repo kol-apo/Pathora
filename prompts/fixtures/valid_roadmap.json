@@ -1,0 +1,147 @@
+{
+  "status": "generated",
+  "primary_match": "Backend engineering for African payments",
+  "consultant_sector": "Technology",
+  "alternative_matches": [
+    {
+      "match": "Data engineering for fintech risk teams",
+      "differs_by": "Moves you from building the systems that move money to building the pipelines that score fraud and credit risk; a better fit if the numbers interest you more than the services."
+    },
+    {
+      "match": "Freelance backend development for small businesses",
+      "differs_by": "Earns from clients sooner and builds a portfolio faster, but with less mentorship and less depth in high-reliability systems than a payments team would give you."
+    },
+    {
+      "match": "Co-founding a payments-adjacent startup",
+      "differs_by": "Uses the same engineering base but adds commercial risk you said you are not ready to carry yet; worth revisiting after a year of shipping production code."
+    }
+  ],
+  "rationale": "You described tracing a failed transfer in your group's wallet project to a race condition and fixing it, and said that was the most satisfying week of your degree. Debugging systems under real constraints is the core of backend payments work. You also said you want work that pays within your first year and that you study on a shared laptop with unreliable power, so this roadmap favours low-bandwidth practice and projects that leave visible evidence. Your third-year coursework in databases and networks is a genuine head start: most of what remains is production habits, not fundamentals.",
+  "student_vector": [0.86, 0.58, 0.31, 0.12, 0.27],
+  "phases": [
+    {
+      "label": "Make one project production-shaped",
+      "horizon": "weeks_1_4",
+      "actions": [
+        {
+          "action": "Rebuild the wallet transfer from your group project as a small API with idempotency keys, so a retried request never moves money twice.",
+          "why": "Idempotency is one of the first things a payments team checks that you understand, and you already know this codebase well.",
+          "hours_per_week": 6,
+          "verification": "A retried request with the same key returns the original result, demonstrated by an automated test."
+        },
+        {
+          "action": "Write a one-page README explaining the race condition you found and how your fix prevents it.",
+          "why": "A clear written account of a real bug you solved is stronger evidence than a certificate, and it is the story you will tell in interviews.",
+          "hours_per_week": 2,
+          "verification": "A classmate who did not work on the project can explain the bug back to you after reading it."
+        },
+        {
+          "action": "Set up an offline-first workflow: a local database, tests that run without internet, and a sync routine for when you have power and data.",
+          "why": "It protects your progress from outages and data costs instead of depending on them.",
+          "hours_per_week": 2,
+          "verification": "The full test suite runs with networking switched off."
+        }
+      ]
+    },
+    {
+      "label": "Learn the shape of real payment systems",
+      "horizon": "months_2_3",
+      "actions": [
+        {
+          "action": "Apply to the ALX Software Engineering Programme or the Google Africa Developer Scholarship, whichever fits your semester, for structured backend practice.",
+          "why": "Structured practice with deadlines and a peer group builds the consistency that self-study often lacks.",
+          "hours_per_week": 8,
+          "verification": "You have submitted an application and blocked the weekly hours in your calendar."
+        },
+        {
+          "action": "Add reconciliation to your API: a daily job that compares your ledger with a simulated provider statement and reports any mismatch.",
+          "why": "Reconciliation is where payment systems actually fail in practice, and few student portfolios show it.",
+          "hours_per_week": 5,
+          "verification": "The job flags a deliberately injected mismatch during a test run."
+        },
+        {
+          "action": "Read the public API documentation of two African payment providers and note how each one reports failed and pending transfers.",
+          "why": "Comparing real designs teaches you the vocabulary payment teams use, without needing anyone's permission or a paid account.",
+          "hours_per_week": 2,
+          "verification": "A short comparison note listing at least three differences in how the providers report transfer status."
+        }
+      ]
+    },
+    {
+      "label": "Put your work in front of practitioners",
+      "horizon": "months_4_6",
+      "actions": [
+        {
+          "action": "Enter AWS Build On Africa with a team, using your reconciliation project as the starting point.",
+          "why": "Building with others under a deadline shows how you collaborate, which a solo project cannot demonstrate.",
+          "hours_per_week": 6,
+          "verification": "Your team submits a working build and you can point to the parts you wrote."
+        },
+        {
+          "action": "Take one small paid or volunteer backend task for a local business, such as automating how it records customer payments.",
+          "why": "A real user with real data is the clearest evidence you can offer, and it starts a track record that you control.",
+          "hours_per_week": 5,
+          "verification": "The business is using what you built and is willing to describe it to a future employer."
+        },
+        {
+          "action": "Book a session with a Pathora consultant in Technology and bring your README and reconciliation design for review.",
+          "why": "Someone who has run payment systems in the region can tell you which of your remaining gaps matter most for the roles you want.",
+          "hours_per_week": 1,
+          "verification": "You leave the session with at least two concrete changes to make to your project."
+        }
+      ]
+    }
+  ],
+  "skill_gaps": [
+    {
+      "skill": "Production API design",
+      "current_level": 2,
+      "target_level": 4,
+      "evidence": "You built a working wallet in a team project, but said it only runs on your laptop and has no automated tests."
+    },
+    {
+      "skill": "Failure handling in distributed systems",
+      "current_level": 2,
+      "target_level": 3,
+      "evidence": "You found and fixed a race condition on your own, which shows the instinct; idempotency and safe retries are the next step."
+    },
+    {
+      "skill": "Technical writing",
+      "current_level": 1,
+      "target_level": 3,
+      "evidence": "You said you find documentation tedious, and payment teams rely heavily on written design reviews."
+    }
+  ],
+  "resources": [
+    {
+      "resource_name": "ALX Software Engineering Programme",
+      "relevance": "Structured backend practice with a peer cohort and deadlines, which suits your goal of steady weekly progress."
+    },
+    {
+      "resource_name": "Google Africa Developer Scholarship",
+      "relevance": "An alternative structured track if its schedule fits your semester better than ALX does."
+    },
+    {
+      "resource_name": "AWS Build On Africa",
+      "relevance": "A team build that turns your reconciliation project into evidence of collaboration under a deadline."
+    }
+  ],
+  "bridge": {
+    "consultant_sector": "Technology",
+    "rationale": "Your direction is specific enough that a practitioner can tell you what matters most: which gaps a payments team would forgive in a junior engineer, and which it would not.",
+    "questions": [
+      "When you hired a junior backend engineer for payments, what did their portfolio show that convinced you?",
+      "How did your team handle a transfer that was debited but never confirmed by the provider?",
+      "What would you build first if you had to learn payments engineering on intermittent power and mobile data?",
+      "How did you get your first paid backend work when you had no track record?"
+    ],
+    "student_preparation": [
+      "Bring the README describing the race condition you fixed, and be ready to walk through it in five minutes.",
+      "Write down the two roles you are weighing, so the session can focus on what separates them."
+    ]
+  },
+  "confidence": {
+    "level": "moderate",
+    "limiting_factor": "Your answers are detailed about technical interests but say little about the kind of team you want to join, so the choice between employment and freelance work is still open."
+  }
+}
