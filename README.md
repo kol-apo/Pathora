@@ -133,51 +133,95 @@ https://www.figma.com/design/xgHTY50iOunFJr3s896yQ0/Pathora?node-id=0-1&t=TDUUwp
 
 ### Screenshots of the app
 
+Captured from the running app against a seeded database. The student, mentor and admin accounts are test accounts.
+
+#### Public pages
+
 **Landing page**
 
 ![Landing page](docs/screenshots/01-landing.png)
 
+The full landing page, with how it works, the four sectors and student stories, is in [docs/screenshots/02-landing-full.png](docs/screenshots/02-landing-full.png).
+
 **Explore consultants**
 
-![Explore consultants](docs/screenshots/02-explore.png)
+![Explore consultants](docs/screenshots/03-explore.png)
 
 **Explore, filtered by sector**
 
-![Explore filtered to Technology](docs/screenshots/03-explore-sector-filter.png)
+![Explore filtered to Technology](docs/screenshots/04-explore-sector-filter.png)
 
-**Consultant profile**
+#### Student
 
-![Consultant profile](docs/screenshots/04-consultant-profile.png)
+**Sign up**
 
-**Booking: choosing a day and time**
+![Sign up](docs/screenshots/05-sign-up.png)
 
-![Booking slot picker](docs/screenshots/05-booking-slot-picker.png)
+**Research consent**, shown once after sign-up (the wording is still a draft)
 
-**Booking: confirmation**
+![Research consent](docs/screenshots/06-consent.png)
 
-![Booking confirmed](docs/screenshots/06-booking-confirmed.png)
+**Career discovery: chatting with the Pathora Guide**
 
-**Career discovery: a question**
-
-![Discovery question](docs/screenshots/07-discover-question.png)
+![Discovery chat](docs/screenshots/07-discovery-chat.png)
 
 **Career discovery: reviewing the answers**
 
-![Reviewing screen](docs/screenshots/08-discover-reviewing.png)
+![Reviewing screen](docs/screenshots/08-discovery-reviewing.png)
 
 **Career discovery: results**
 
-![Discovery results](docs/screenshots/09-discover-results.png)
+![Discovery results](docs/screenshots/09-discovery-results.png)
 
-The full results page, with the roadmap and the matched consultants, is in [docs/screenshots/10-discover-results-full.png](docs/screenshots/10-discover-results-full.png).
+The full results page, with the three-year roadmap and three consultants in the matched sector, is in [docs/screenshots/10-discovery-results-full.png](docs/screenshots/10-discovery-results-full.png).
+
+**Consultant profile**
+
+![Consultant profile](docs/screenshots/11-consultant-profile.png)
+
+**Booking: choosing a day and time**, generated from the mentor's weekly hours and shown in the student's timezone
+
+![Booking slot picker](docs/screenshots/12-booking-slot-picker.png)
+
+**Booking: confirmation**
+
+![Booking confirmed](docs/screenshots/13-booking-confirmed.png)
 
 **Student dashboard** (sample data)
 
-![Student dashboard](docs/screenshots/11-dashboard.png)
+![Student dashboard](docs/screenshots/14-student-dashboard.png)
 
-**Session room** (interface mock-up)
+**Session room** (interface mock-up; live video is not built yet)
 
-![Session room](docs/screenshots/12-session-room.png)
+![Session room](docs/screenshots/21-session-room.png)
+
+#### Mentor
+
+**Applying as a mentor**, with LinkedIn, X and other links
+
+![Mentor application](docs/screenshots/15-mentor-application.png)
+
+**Setting weekly hours**
+
+![Mentor availability](docs/screenshots/16-mentor-availability.png)
+
+**Mentor console**: a student's request waiting to be confirmed. Mentors see the student's first name only.
+
+![Mentor console](docs/screenshots/20-mentor-console.png)
+
+**The approved mentor's public profile**
+
+![Mentor public profile](docs/screenshots/19-mentor-public-profile.png)
+
+#### Admin
+
+**Overview**, with the study's measures
+
+![Admin overview](docs/screenshots/17-admin-overview.png)
+
+**Reviewing a mentor application** and setting the mentor's interest profile, which the bridge uses for matching
+
+![Admin mentor review](docs/screenshots/18-admin-mentor-review.png)
 
 ### Database (MongoDB)
 
@@ -232,7 +276,7 @@ Also add `AUTH_SECRET` (and the Google keys, if used) in Vercel. For Google sign
 
 ## Video demo
 
-https://docs.google.com/document/d/1gMY85q9OEPCydZcQWp3O5KaEkkg3dY5oFVZUjwY3qaY/edit?usp=sharing
+https://youtu.be/562JOBwNsII
 
 ## Code files
 
