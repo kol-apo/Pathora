@@ -40,6 +40,14 @@ export interface IBooking {
 
   status: BookingStatus;
 
+  /** The discovery result this booking came from, if any. */
+  discoveryResult?: Types.ObjectId;
+  /**
+   * True when booked from a mentor surfaced on that result (the bridge). This
+   * is the conversion the study measures; it requires `discoveryResult`.
+   */
+  viaBridge: boolean;
+
   /**
    * Mirrors `status`, true for anything in ACTIVE_BOOKING_STATUSES. Exists only
    * so the slot-uniqueness index can be a partial index on a boolean equality,
@@ -48,14 +56,11 @@ export interface IBooking {
    */
   active: boolean;
 
-  /** Whereby room, created when the booking is confirmed. */
-  roomUrl?: string;
-  roomId?: string;
-
   notes: IBookingNote[];
   rating?: IBookingRating;
 
   cancelledBy?: Types.ObjectId;
+  cancelledAt?: Date;
   cancelReason?: string;
 
   createdAt: Date;
@@ -98,8 +103,8 @@ const BookingSchema = new Schema<IBooking>(
     },
     active: { type: Boolean, required: true, default: true },
 
-    roomUrl: { type: String },
-    roomId: { type: String },
+    discoveryResult: { type: Schema.Types.ObjectId, ref: 'DiscoveryResult' },
+    viaBridge: { type: Boolean, default: false },
 
     // Bounded and always read alongside the booking, so embedded rather than
     // split into their own collection.
@@ -107,6 +112,7 @@ const BookingSchema = new Schema<IBooking>(
     rating: { type: BookingRatingSchema },
 
     cancelledBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    cancelledAt: { type: Date },
     cancelReason: { type: String, maxlength: 500 },
   },
   { timestamps: true },
@@ -116,6 +122,12 @@ const BookingSchema = new Schema<IBooking>(
 BookingSchema.pre('validate', function () {
   if (this.endsAt <= this.startsAt) {
     throw new Error('endsAt must be after startsAt.');
+  }
+  if (this.viaBridge && !this.discoveryResult) {
+    throw new Error('A bridge booking must reference the discovery result it came from.');
+  }
+  if (this.status === 'cancelled' && !this.cancelledAt) {
+    this.cancelledAt = new Date();
   }
   // Keep the index discriminator in step with status on every write.
   this.active = ACTIVE_BOOKING_STATUSES.includes(this.status);
@@ -141,6 +153,8 @@ BookingSchema.index(
 BookingSchema.index({ student: 1, startsAt: -1 });
 /** Mentor console: upcoming sessions for a mentor. */
 BookingSchema.index({ mentor: 1, status: 1, startsAt: 1 });
+/** Research: bookings that came through the bridge, per result. */
+BookingSchema.index({ discoveryResult: 1 }, { partialFilterExpression: { viaBridge: true } });
 
 const Booking: Model<IBooking> =
   (mongoose.models.Booking as Model<IBooking>) ??

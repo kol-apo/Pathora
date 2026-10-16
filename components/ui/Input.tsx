@@ -13,7 +13,7 @@ export default function Input({ icon, className = '', ...rest }: InputProps) {
         </span>
       )}
       <input
-        className={`h-[46px] w-full rounded border border-line bg-white text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none ${
+        className={`h-[46px] w-full rounded border border-line bg-white text-sm text-ink placeholder:text-faint focus:border-navy focus:outline-none ${
           icon ? 'pl-[42px] pr-4' : 'px-4'
         }`}
         {...rest}

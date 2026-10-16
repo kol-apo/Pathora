@@ -10,7 +10,7 @@ import ConsultantCard from '@/components/consultant/ConsultantCard';
 import SectorFilter from '@/components/consultant/SectorFilter';
 import { toConsultant } from '@/lib/mentors';
 import type { MentorDTO } from '@/lib/db/queries/dto';
-import type { Consultant } from '@/lib/types';
+import { SECTORS, type Consultant } from '@/lib/types';
 
 type SortKey = 'experience' | 'rating' | 'booked';
 
@@ -32,6 +32,13 @@ export default function ExplorePage() {
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [load, setLoad] = useState<LoadState>('loading');
   const [attempt, setAttempt] = useState(0);
+
+  // Arriving from a sector card on the landing page (/explore?sector=Finance)
+  // opens Explore already filtered to that sector.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('sector');
+    if (requested && (SECTORS as string[]).includes(requested)) setSector(requested);
+  }, []);
 
   /**
    * Sector and sort are applied by the database: each change asks the API for
@@ -120,7 +127,7 @@ export default function ExplorePage() {
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortKey)}
                 aria-label="Sort consultants"
-                className="h-[46px] w-full appearance-none rounded border border-line bg-white pl-[52px] pr-10 text-sm font-medium text-ink focus:border-ink focus:outline-none"
+                className="h-[46px] w-full appearance-none rounded border border-line bg-white pl-[52px] pr-10 text-sm font-medium text-ink focus:border-navy focus:outline-none"
               >
                 {(Object.keys(sortLabels) as SortKey[]).map((key) => (
                   <option key={key} value={key}>
@@ -174,7 +181,7 @@ export default function ExplorePage() {
             </p>
             <button
               onClick={() => setAttempt((n) => n + 1)}
-              className="mt-6 rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+              className="mt-6 rounded bg-navy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
             >
               Try again
             </button>
@@ -212,7 +219,7 @@ export default function ExplorePage() {
             </p>
             <button
               onClick={resetFilters}
-              className="mt-6 rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+              className="mt-6 rounded bg-navy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
             >
               Browse all consultants
             </button>
@@ -222,7 +229,7 @@ export default function ExplorePage() {
         {/* Consultant recruitment banner */}
         <section
           id="join"
-          className="on-dark mx-5 mb-16 flex flex-col gap-6 rounded-lg bg-ink p-8 md:mx-10 md:flex-row md:items-center md:justify-between md:p-10"
+          className="on-dark mx-5 mb-16 flex flex-col gap-6 rounded-lg bg-navy p-8 md:mx-10 md:flex-row md:items-center md:justify-between md:p-10"
         >
           <div>
             <h2 className="text-2xl font-bold tracking-[-0.02em] text-white">
@@ -233,7 +240,7 @@ export default function ExplorePage() {
             </p>
           </div>
           <Link
-            href="#"
+            href="/become-a-mentor"
             className="shrink-0 self-start rounded bg-white px-6 py-3 text-sm font-medium text-ink transition-colors hover:bg-white/90 md:self-auto"
           >
             Join as a consultant

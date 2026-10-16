@@ -5,7 +5,7 @@ import Avatar from '@/components/ui/Avatar';
 export default function UpcomingSession({ session }: { session: UpcomingSessionType }) {
   const c = session.consultant;
   return (
-    <section className="on-dark flex flex-col gap-6 rounded-lg bg-ink p-[26px] md:flex-row md:items-center md:justify-between">
+    <section className="on-dark flex flex-col gap-6 rounded-lg bg-navy p-[26px] md:flex-row md:items-center md:justify-between">
       <div className="flex items-center gap-[18px]">
         <Avatar initials={c.initials} size="lg" tone="dark" className="hidden sm:inline-flex" />
         <div className="flex flex-col gap-[5px]">

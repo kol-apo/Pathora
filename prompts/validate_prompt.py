@@ -40,19 +40,19 @@ if hasattr(sys.stdout, "reconfigure"):
 HERE = Path(__file__).resolve().parent
 SPEC_PATH = HERE / "discovery.json"
 FIXTURES = HERE / "fixtures"
-SCHEMA_SQL = HERE.parent / "schema.sql"
+CATALOGUE = HERE.parent / "lib" / "research" / "verified-resources.json"
 
 # Literal strings each layer must keep. They live here, in code, rather than in
 # discovery.json, so a careless edit to the JSON cannot delete a guardrail and
 # its check in the same stroke.
 REQUIRED_LITERALS = {
-    "layer_1_identity": ["surface_bridge_consultants", "not name"],
+    "layer_1_identity": ["surfaceBridgeConsultants", "not name"],
     "layer_2_african_context": ["informal", "Never emit a URL"],
     "layer_3_output_contract": ["exactly one JSON object", "never optional"],
     "layer_4_guardrails": ["No guaranteed outcomes", "wellbeing_referral", "out_of_scope"],
 }
 EXPECTED_LAYERS = list(REQUIRED_LITERALS)
-VECTOR_DIMENSION = 5  # must match real[5] in schema.sql
+VECTOR_DIMENSION = 5  # must match VECTOR_DIMENSION in lib/matching/similarity.ts
 
 
 # --------------------------------------------------------------------------
@@ -94,19 +94,14 @@ def load_json(path: Path):
 
 
 def load_catalogue() -> set[str]:
-    """Resource names from the verified_resources seed in schema.sql.
+    """Resource names from lib/research/verified-resources.json.
 
-    Reading the seed directly means the prompt allow-list and the database
-    allow-list cannot drift apart.
+    The same file seeds the VerifiedResource collection in MongoDB
+    (scripts/seed.ts), so the prompt allow-list and the database allow-list
+    cannot drift apart.
     """
-    sql = SCHEMA_SQL.read_text(encoding="utf-8")
-    block = re.search(
-        r"-- BEGIN verified_resources seed(.*?)-- END verified_resources seed", sql, re.S
-    )
-    if not block:
-        raise SystemExit("Could not find the verified_resources seed markers in schema.sql")
-    names = re.findall(r"^\s*\('((?:[^']|'')+)'", block.group(1), re.M)
-    return {n.replace("''", "'") for n in names}
+    data = load_json(CATALOGUE)
+    return {r["name"] for r in data["resources"]}
 
 
 def assemble_system_prompt(spec: dict) -> str:
@@ -310,7 +305,7 @@ def step_2_schemas(spec: dict, roadmap: dict, refusal: dict,
 
 def step_3_validators(spec: dict, roadmap: dict, catalogue: set[str], report: Report) -> None:
     heading("Step 3  Post-schema validators on the known-good roadmap")
-    report.check(len(catalogue) == 12, f"catalogue loaded from schema.sql seed ({len(catalogue)} names)")
+    report.check(len(catalogue) == 12, f"catalogue loaded from lib/research/verified-resources.json ({len(catalogue)} names)")
 
     declared = {v["id"]: v["on_failure"] for v in spec["post_schema_validation"]}
     report.check(len(declared) == 7, f"discovery.json declares 7 post-schema validators ({len(declared)})")

@@ -10,7 +10,7 @@ const sizeClasses: Record<Size, string> = {
 };
 
 const toneClasses = {
-  light: 'bg-fill text-ink',
+  light: 'bg-sky-soft text-navy',
   dark: 'bg-white/[0.07] text-white',
 } as const;
 

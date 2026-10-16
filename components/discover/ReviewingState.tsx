@@ -1,4 +1,9 @@
-/** The interstitial between the last question and the results (design 1c). */
+import Guide from '@/components/brand/Guide';
+
+/**
+ * The interstitial between the last answer and the results. It always shows
+ * for at least 2.5 seconds (enforced by the discover page).
+ */
 export default function ReviewingState() {
   return (
     <div
@@ -6,8 +11,9 @@ export default function ReviewingState() {
       role="status"
       aria-live="polite"
     >
-      <div className="h-0.5 w-[120px] overflow-hidden bg-line">
-        <div className="animate-bar h-0.5 w-[32%] bg-ink motion-reduce:animate-none" />
+      <Guide size={96} mood="thinking" />
+      <div className="mt-2 h-0.5 w-[120px] overflow-hidden bg-sky-muted">
+        <div className="animate-bar h-0.5 w-[32%] bg-navy motion-reduce:animate-none" />
       </div>
       <h2 className="text-[26px] font-semibold tracking-[-0.02em] text-ink">
         Reviewing your answers

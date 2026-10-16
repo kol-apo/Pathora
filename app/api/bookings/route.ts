@@ -2,25 +2,28 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createBooking, listBookingsForStudent } from '@/lib/db/queries';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
-import { getDemoStudentId } from '@/lib/db/demo';
+import { auth } from '@/auth';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * TEMPORARY: identity comes from the request until auth exists.
- *
- * Trusting a client-supplied studentId is not acceptable in production — it
- * would let anyone book as anyone. With no id given, falls back to the seeded
- * demo student (development only — see `getDemoStudentId`). Replace this single
- * function with a session lookup when Auth.js lands; nothing else in this file
- * changes.
+ * The signed-in student's id, from the session. Identity never comes from the
+ * request body: that would let anyone book as anyone.
  */
-async function resolveStudentId(body: { studentId?: string }): Promise<string | null> {
-  return body.studentId ?? (await getDemoStudentId());
+async function signedInStudent(): Promise<{ id: string } | { error: NextResponse }> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: NextResponse.json({ error: 'Sign in to book a session.' }, { status: 401 }) };
+  }
+  if (session.user.role !== 'student') {
+    return {
+      error: NextResponse.json({ error: 'Only student accounts can book sessions.' }, { status: 403 }),
+    };
+  }
+  return { id: session.user.id };
 }
 
 const CreateSchema = z.object({
-  studentId: z.string().min(1).optional(),
   mentorId: z.string().min(1),
   startsAt: z.coerce.date(),
   topic: z.string().trim().min(1).max(200),
@@ -45,14 +48,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const studentId = await resolveStudentId(parsed.data);
-  if (!studentId) {
-    return NextResponse.json({ error: 'Sign in to book a session.' }, { status: 401 });
-  }
+  const student = await signedInStudent();
+  if ('error' in student) return student.error;
 
   try {
     const booking = await createBooking({
-      studentId,
+      studentId: student.id,
       mentorId: parsed.data.mentorId,
       startsAt: parsed.data.startsAt,
       topic: parsed.data.topic,
@@ -72,14 +73,12 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  const studentId = new URL(request.url).searchParams.get('studentId');
-  if (!studentId) {
-    return NextResponse.json({ error: 'Sign in to see your sessions.' }, { status: 401 });
-  }
+export async function GET() {
+  const student = await signedInStudent();
+  if ('error' in student) return student.error;
 
   try {
-    const bookings = await listBookingsForStudent(studentId, { upcomingOnly: true });
+    const bookings = await listBookingsForStudent(student.id, { upcomingOnly: true });
     return NextResponse.json({ bookings });
   } catch (err) {
     if (err instanceof DataError) {

@@ -14,7 +14,21 @@ export type DataErrorCode =
   | 'SLOT_TAKEN'
   | 'BOOKING_NOT_FOUND'
   | 'NOT_A_PARTICIPANT'
-  | 'INVALID_TRANSITION';
+  | 'INVALID_TRANSITION'
+  | 'MENTOR_NOT_APPROVED'
+  | 'RESULT_NOT_FOUND'
+  | 'NO_STUDENT_VECTOR'
+  | 'INSUFFICIENT_CONSULTANTS'
+  | 'BRIDGE_REQUIRES_RESULT'
+  | 'BRIDGE_SECTOR_MISMATCH'
+  | 'EMAIL_TAKEN'
+  | 'ACCOUNT_EXISTS'
+  | 'NOT_A_STUDENT'
+  | 'ALREADY_APPLIED'
+  | 'NOT_A_MENTOR'
+  | 'INVALID_VECTOR'
+  | 'INVALID_AVAILABILITY'
+  | 'INVALID_APPLICATION';
 
 export class DataError extends Error {
   constructor(
@@ -39,6 +53,23 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   // 404 rather than 403 — do not confirm a booking exists to a non-participant.
   NOT_A_PARTICIPANT: 404,
   INVALID_TRANSITION: 409,
+  MENTOR_NOT_APPROVED: 409,
+  // 404 for someone else's result too, so result ids cannot be probed.
+  RESULT_NOT_FOUND: 404,
+  NO_STUDENT_VECTOR: 409,
+  // The bridge refuses to show fewer than three people rather than degrading quietly.
+  INSUFFICIENT_CONSULTANTS: 409,
+  BRIDGE_REQUIRES_RESULT: 400,
+  BRIDGE_SECTOR_MISMATCH: 409,
+  EMAIL_TAKEN: 409,
+  // A Google sign-in for an email that already has a password account.
+  ACCOUNT_EXISTS: 409,
+  NOT_A_STUDENT: 403,
+  ALREADY_APPLIED: 409,
+  NOT_A_MENTOR: 403,
+  INVALID_VECTOR: 422,
+  INVALID_AVAILABILITY: 422,
+  INVALID_APPLICATION: 422,
 };
 
 export function statusForError(err: unknown): number {

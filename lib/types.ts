@@ -20,6 +20,10 @@ export interface Consultant {
   /** `null` means available this week; otherwise the wait, e.g. "in 2 weeks". */
   nextSlot: string | null;
   helpWith: string[];
+  /** LinkedIn and X addresses, when the consultant has added them. */
+  socials?: { linkedin?: string; x?: string };
+  /** Portfolio, publications, videos or a website. */
+  links?: { kind: 'portfolio' | 'publication' | 'video' | 'website'; url: string; title?: string }[];
 }
 
 export type OpportunityType = 'Fellowship' | 'Hackathon' | 'Internship' | 'Campus program';

@@ -2,6 +2,14 @@ import { describeAnswers, topSector, type DiscoveryAnswers } from '@/lib/discove
 import { SECTORS } from '@/lib/types';
 import { RESPONSE_SHAPE } from './schema';
 
+/**
+ * Version of the prompt in this file, stored on every DiscoveryResult as
+ * promptVersion. Bump it whenever SYSTEM_PROMPT or buildUserPrompt changes, so
+ * results stay traceable to the exact prompt that produced them. The research
+ * specification in prompts/discovery.json carries its own version.
+ */
+export const PROMPT_VERSION = 'app-discovery-v1';
+
 export const SYSTEM_PROMPT = `You are Pathora's career discovery guide. You advise university students in Africa — Nigeria, Ghana, Kenya, Rwanda, South Africa and beyond — who are trying to work out what career to pursue.
 
 How you think:

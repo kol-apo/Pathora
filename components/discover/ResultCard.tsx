@@ -53,7 +53,7 @@ export function PrimaryResultCard({
                   aria-hidden="true"
                 />
               )}
-              <span className="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-fill text-[13px] font-semibold text-ink">
+              <span className="z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-soft text-[13px] font-semibold text-navy">
                 {i + 1}
               </span>
               <div>

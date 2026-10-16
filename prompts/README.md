@@ -9,7 +9,7 @@ python3 validate_prompt.py
 
 ## Why a versioned JSON file, not a string in the code
 
-- **Provenance for the dissertation.** `prompt_version` is written to every row in `roadmaps`, alongside `model_version`. Any roadmap in the dataset can be traced to the exact prompt and model that produced it, and `v_schema_validation` reports output validity per prompt version.
+- **Provenance for the dissertation.** The prompt version is stored as `promptVersion` on every `DiscoveryResult` in MongoDB, alongside `model`. Any roadmap in the dataset can be traced to the exact prompt and model that produced it, and `npm run report` shows output validity per prompt version.
 - **Falsifiability.** "Pathora always surfaces a human" is a claim about the system, and a claim in a string literal cannot be tested. Here the bridge is a required field in the output schema, its presence is checked by a validator, and the validator is itself tested against output with the bridge removed. The claim can fail, visibly.
 - **Separation of concerns.** The prompt, its output contract and its validators change together and are reviewed together. The application loads the file; it does not own the wording.
 
@@ -28,7 +28,7 @@ The system prompt is assembled from four layers, in the order declared in `assem
 
 ## Division of labour: the model proposes, the database matches
 
-The model decides **direction**: a sector, a five-axis interest vector, a phased plan, and the questions the student should bring to a practitioner. It never decides **which person**. The database function `surface_bridge_consultants()` takes the sector and vector and ranks approved consultants in that sector by cosine similarity.
+The model decides **direction**: a sector, a five-axis interest vector, a phased plan, and the questions the student should bring to a practitioner. It never decides **which person**. The server function `surfaceBridgeConsultants()` in `lib/db/queries/bridge.ts` takes the sector and vector and ranks approved consultants in that sector by cosine similarity.
 
 This split makes matching auditable. The same vector always produces the same ranking, so any match can be reproduced and explained from stored data without calling the model again. It also means a model cannot invent a consultant, favour one, or describe one inaccurately, because it never names one.
 
@@ -46,14 +46,14 @@ Five axes, each scored from 0 to 1:
 
 This is Holland's (1997) RIASEC model with Realistic and Investigative merged into one technical axis. In these labour markets, hands-on and analytical technical work are largely the same roles, so keeping both would add a near-duplicate dimension and inflate the similarity between every pair of technical profiles.
 
-Consultants are scored on the same five axes when they are approved, which is what makes comparing the two vectors meaningful. The dimension must stay 5 to match `real[5]` in `schema.sql`, and the validator checks that it does.
+Consultants are scored on the same five axes when they are approved, which is what makes comparing the two vectors meaningful. The dimension must stay 5 to match `VECTOR_DIMENSION` in `lib/matching/similarity.ts`, which the MongoDB models enforce, and the validator checks that it does.
 
 The vector is not normalised to sum to 1. Cosine similarity ignores magnitude anyway, and leaving each axis independent lets the model say a student is strong on two axes at once.
 
 ## Two layers of validation
 
 1. **The output schema** (JSON Schema, draft 2020-12, `additionalProperties: false` throughout) checks shape: exactly three phases in a fixed order, a five-number vector, three to five bridge questions, no undeclared fields, no empty prose.
-2. **The post-schema validators** check what a schema cannot express: no URLs at any depth, every resource on the verified allow-list, the bridge sector matching the roadmap sector, the bridge present, and a vector with a non-zero norm. A heuristic name check flags possible named individuals for human review, rather than rejecting, because pattern-based name detection produces false positives. If any rejecting check fails, the roadmap is regenerated once with the failed check names appended; a second failure is stored as `schema_valid = false` and shown to the student as a handled error.
+2. **The post-schema validators** check what a schema cannot express: no URLs at any depth, every resource on the verified allow-list (`lib/research/verified-resources.json`, the same file that seeds the `VerifiedResource` collection), the bridge sector matching the roadmap sector, the bridge present, and a vector with a non-zero norm. A heuristic name check flags possible named individuals for human review, rather than rejecting, because pattern-based name detection produces false positives. If any rejecting check fails, the roadmap is regenerated once with the failed check names appended; a second failure is stored with `schemaValid: false` and shown to the student as a handled error.
 
 The refusal envelope (`wellbeing_referral` or `out_of_scope`) is a separate schema, not a branch of the roadmap schema, so the application dispatches on `status` and validation errors stay readable.
 

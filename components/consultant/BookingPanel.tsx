@@ -50,6 +50,8 @@ export default function BookingPanel({
   const [selected, setSelected] = useState<Slot | null>(null);
   const [topic, setTopic] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** Set when booking failed because nobody is signed in. */
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [bookedAt, setBookedAt] = useState<Date | null>(null);
 
   const available = consultant.nextSlot === null;
@@ -87,6 +89,7 @@ export default function BookingPanel({
     if (!selected) return;
     setStep('submitting');
     setError(null);
+    setNeedsSignIn(false);
 
     try {
       const res = await fetch('/api/bookings', {
@@ -117,6 +120,12 @@ export default function BookingPanel({
         return;
       }
 
+      if (res.status === 401) {
+        setNeedsSignIn(true);
+        setError('Sign in or create a free account to book this session.');
+        setStep('picking');
+        return;
+      }
       setError(data.error ?? 'Something went wrong, and your session was not booked. Please try again.');
       setStep('picking');
     } catch {
@@ -165,7 +174,17 @@ export default function BookingPanel({
           className="mt-5 flex gap-2.5 rounded-lg border border-line bg-surface p-3.5 text-[12.5px] leading-relaxed text-ink"
         >
           <AlertCircle size={15} strokeWidth={1.5} className="mt-px shrink-0" />
-          <p>{error}</p>
+          <div>
+            <p>{error}</p>
+            {needsSignIn && (
+              <Link
+                href={`/signin?callbackUrl=${encodeURIComponent(`/consultants/${consultant.id}`)}`}
+                className="mt-2 inline-block font-medium text-navy underline underline-offset-2"
+              >
+                Sign in to book
+              </Link>
+            )}
+          </div>
         </div>
       )}
 
@@ -221,7 +240,7 @@ export default function BookingPanel({
                       }}
                       className={`flex w-[62px] shrink-0 flex-col items-center rounded border py-2 transition-colors ${
                         active
-                          ? 'border-ink bg-ink text-white'
+                          ? 'border-navy bg-navy text-white'
                           : 'border-line text-ink hover:bg-surface'
                       }`}
                     >
@@ -246,7 +265,7 @@ export default function BookingPanel({
                       onClick={() => setSelected(s)}
                       className={`h-9 rounded border text-[13px] font-medium transition-colors ${
                         active
-                          ? 'border-ink bg-ink text-white'
+                          ? 'border-navy bg-navy text-white'
                           : 'border-line text-ink hover:bg-surface'
                       }`}
                     >
@@ -301,7 +320,7 @@ export default function BookingPanel({
       )}
 
       {step === 'done' && bookedAt && (
-        <div className="mt-5 rounded-lg bg-surface p-4 text-center">
+        <div className="mt-5 rounded-lg bg-sky-soft p-4 text-center">
           <p className="inline-flex items-center gap-2 text-sm font-medium text-ink">
             <Check size={16} strokeWidth={2} className="text-available" />
             Session requested

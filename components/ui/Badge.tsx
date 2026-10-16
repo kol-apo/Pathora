@@ -5,7 +5,7 @@ type Variant = 'sector' | 'sector-dark' | 'tag' | 'tag-dark' | 'label' | 'urgent
 const variantClasses: Record<Variant, string> = {
   /** Uppercase micro-label on a fill chip — used for sector. */
   sector:
-    'bg-fill text-ink px-2.5 py-[5px] text-micro font-semibold uppercase',
+    'bg-sky-soft text-navy px-2.5 py-[5px] text-micro font-semibold uppercase',
   'sector-dark':
     'bg-white/[0.07] text-white/75 px-2.5 py-[5px] text-micro font-semibold uppercase',
   /** Outlined chip for skills and focus areas. */

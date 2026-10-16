@@ -63,7 +63,7 @@ export default function ConsultantCard({ consultant }: { consultant: Consultant 
 
       <Link
         href={`/consultants/${c.id}`}
-        className="rounded bg-ink-soft py-[11px] text-center text-sm font-medium text-white transition-colors hover:bg-black"
+        className="rounded bg-navy py-[11px] text-center text-sm font-medium text-white transition-colors hover:bg-navy-deep"
       >
         Book a Session
       </Link>

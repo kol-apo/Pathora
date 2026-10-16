@@ -1,6 +1,6 @@
 import { isValidObjectId } from 'mongoose';
 import dbConnect from '../connect';
-import { Availability, Booking, MentorProfile } from '../models';
+import { Availability, Booking, BridgeRecommendation, DiscoveryResult, MentorProfile } from '../models';
 import { ACTIVE_BOOKING_STATUSES, type BookingStatus } from '../models/Booking';
 import { findSlot } from '@/lib/booking/slots';
 import { DataError, isDuplicateKeyError } from './errors';
@@ -14,6 +14,10 @@ export interface CreateBookingInput {
   /** Must match a generated slot start exactly. */
   startsAt: Date;
   topic: string;
+  /** The discovery result this booking came from, if any. Must belong to the student. */
+  discoveryResultId?: string;
+  /** Booked from a mentor surfaced on that result. Requires discoveryResultId. */
+  viaBridge?: boolean;
   now?: Date;
 }
 
@@ -33,9 +37,14 @@ export interface CreateBookingInput {
  *
  * Layer 1 alone is a time-of-check-to-time-of-use bug. Layer 2 alone would let
  * someone book 3am. Neither is redundant.
+ *
+ * Bridge rules: only approved mentors can be booked; a bridge booking must name
+ * the discovery result it came from, which must belong to the student, and may
+ * not leave that result's sector. A successful bridge booking stamps bookedAt
+ * on the matching BridgeRecommendation, closing the funnel the study measures.
  */
 export async function createBooking(input: CreateBookingInput): Promise<BookingDTO> {
-  const { studentId, mentorId, startsAt, topic } = input;
+  const { studentId, mentorId, startsAt, topic, discoveryResultId, viaBridge = false } = input;
 
   if (!isValidObjectId(studentId) || !isValidObjectId(mentorId)) {
     throw new DataError('INVALID_ID', 'Malformed student or mentor id.');
@@ -51,6 +60,28 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
   if (!mentor) throw new DataError('MENTOR_NOT_FOUND', 'No such mentor.');
   if (mentor.acceptingBookings === false) {
     throw new DataError('MENTOR_NOT_ACCEPTING', 'This mentor is not taking new sessions.');
+  }
+  if (!mentor.vetted) {
+    throw new DataError('MENTOR_NOT_APPROVED', 'This mentor has not been approved yet.');
+  }
+
+  if (viaBridge && !discoveryResultId) {
+    throw new DataError('BRIDGE_REQUIRES_RESULT', 'A bridge booking must reference a discovery result.');
+  }
+  if (discoveryResultId) {
+    if (!isValidObjectId(discoveryResultId)) {
+      throw new DataError('INVALID_ID', 'Malformed discovery result id.');
+    }
+    const result = await DiscoveryResult.findById(discoveryResultId).select('student primary.sector').lean();
+    if (!result || (result.student && String(result.student) !== studentId)) {
+      throw new DataError('RESULT_NOT_FOUND', 'No such discovery result.');
+    }
+    if (viaBridge && mentor.sector !== result.primary.sector) {
+      throw new DataError(
+        'BRIDGE_SECTOR_MISMATCH',
+        `A ${mentor.sector} mentor cannot be booked through the bridge of a ${result.primary.sector} result.`,
+      );
+    }
   }
 
   const rules = await Availability.findOne({ mentor: mentorId }).lean();
@@ -76,7 +107,16 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       startsAt: slot.startsAt,
       endsAt: slot.endsAt,
       status: 'pending',
+      discoveryResult: discoveryResultId,
+      viaBridge,
     });
+
+    if (viaBridge) {
+      await BridgeRecommendation.updateOne(
+        { discoveryResult: discoveryResultId, mentor: mentorId, bookedAt: { $exists: false } },
+        { $set: { bookedAt: new Date() } },
+      );
+    }
     return toBookingDTO(created.toObject());
   } catch (err) {
     if (isDuplicateKeyError(err)) {
@@ -222,7 +262,7 @@ export async function addBookingNote(
   const doc = await Booking.findByIdAndUpdate(
     bookingId,
     { $push: { notes: { body: body.trim(), author: authorId, createdAt: new Date() } } },
-    { new: true, runValidators: true },
+    { returnDocument: 'after', runValidators: true },
   ).lean();
 
   if (!doc) throw new DataError('BOOKING_NOT_FOUND', 'No such booking.');

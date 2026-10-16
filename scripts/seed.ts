@@ -6,22 +6,47 @@
  *
  * Requires MONGODB_URI. Safe to re-run.
  */
-import 'dotenv/config';
+import './env';
 import mongoose from 'mongoose';
 import dbConnect from '../lib/db/connect';
 import {
+  AnalyticsEvent,
   Availability,
   Booking,
+  BridgeRecommendation,
   DiscoveryResult,
   MentorProfile,
   Opportunity,
   StudentProfile,
   User,
+  VerifiedResource,
+  VideoSession,
 } from '../lib/db/models';
+import catalogue from '../lib/research/verified-resources.json';
 import { consultants, currentStudent, opportunities } from '../lib/data';
 import { DEMO_STUDENT_EMAIL, slug } from '../lib/db/demo';
 
 const fresh = process.argv.includes('--fresh');
+
+/**
+ * Each sample mentor's position on the five interest axes (prompts/discovery.json
+ * vector_space): technical, analytical, commercial, expressive, facilitative.
+ * In production these are set by an admin at approval time.
+ */
+const PROFILE_VECTORS: Record<string, number[]> = {
+  'Taiwo Adeyemi': [0.72, 0.5, 0.62, 0.3, 0.6],
+  'Chidi Eze': [0.92, 0.58, 0.22, 0.12, 0.25],
+  'Wanjiru Kamau': [0.85, 0.82, 0.3, 0.15, 0.3],
+  'Nkechi Okafor': [0.45, 0.9, 0.58, 0.1, 0.22],
+  'Fatima Al-Hassan': [0.35, 0.85, 0.5, 0.12, 0.55],
+  'Kwame Asante': [0.4, 0.92, 0.45, 0.08, 0.3],
+  'Amara Diallo': [0.25, 0.35, 0.88, 0.55, 0.62],
+  'Tunde Bakare': [0.45, 0.42, 0.95, 0.2, 0.5],
+  'Ifeoma Nwosu': [0.35, 0.5, 0.92, 0.25, 0.45],
+  'Zainab Mensah': [0.25, 0.25, 0.48, 0.92, 0.55],
+  'David Okoro': [0.38, 0.18, 0.35, 0.95, 0.4],
+  'Thandiwe Dlamini': [0.6, 0.35, 0.3, 0.88, 0.5],
+};
 
 /** "14 Sep" -> a Date this year, rolled to next year if already past. */
 function parseDeadline(text: string): Date | null {
@@ -74,6 +99,10 @@ async function main() {
       Booking.deleteMany({}),
       Opportunity.deleteMany({}),
       DiscoveryResult.deleteMany({}),
+      BridgeRecommendation.deleteMany({}),
+      VerifiedResource.deleteMany({}),
+      AnalyticsEvent.deleteMany({}),
+      VideoSession.deleteMany({}),
     ]);
     console.log('cleared collections');
   }
@@ -95,8 +124,22 @@ async function main() {
     Booking.syncIndexes(),
     Opportunity.syncIndexes(),
     DiscoveryResult.syncIndexes(),
+    BridgeRecommendation.syncIndexes(),
+    VerifiedResource.syncIndexes(),
+    AnalyticsEvent.syncIndexes(),
+    VideoSession.syncIndexes(),
   ]);
   console.log('indexes synced');
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+  // Every approval must name an admin, so the seed creates one to approve the
+  // sample mentors.
+  const admin = await User.findOneAndUpdate(
+    { email: 'admin@pathora.test' },
+    { $set: { name: 'Pathora Admin', role: 'admin', emailVerified: new Date() } },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
+  );
+  console.log('seeded admin admin@pathora.test');
 
   // ── Mentors ───────────────────────────────────────────────────────────────
   let mentorCount = 0;
@@ -106,7 +149,7 @@ async function main() {
     const user = await User.findOneAndUpdate(
       { email },
       { $set: { name: c.name, role: 'mentor', emailVerified: new Date() } },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
     const mentor = await MentorProfile.findOneAndUpdate(
@@ -124,15 +167,22 @@ async function main() {
           bio: c.bio,
           helpWith: c.helpWith,
           timezone: 'Africa/Lagos',
-          vetted: true,
-          vettedAt: new Date(),
+          country: 'Nigeria',
+          // vetted is derived from status by the model.
+          status: 'approved',
+          approvedBy: admin._id,
+          approvedAt: new Date(),
+          codeOfConductOk: true,
+          profileVector: PROFILE_VECTORS[c.name],
           acceptingBookings: true,
           ratingAvg: c.rating,
           ratingCount: Math.max(1, Math.round(c.sessions * 0.6)),
           sessionCount: c.sessions,
         },
+        // Fields from the earlier vetting model, no longer used.
+        $unset: { vettedAt: '', vettedBy: '' },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
     await Availability.findOneAndUpdate(
@@ -147,7 +197,7 @@ async function main() {
           horizonDays: 60,
         },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
 
     mentorCount++;
@@ -159,7 +209,7 @@ async function main() {
   const studentUser = await User.findOneAndUpdate(
     { email: studentEmail },
     { $set: { name: currentStudent.name, role: 'student', emailVerified: new Date() } },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
   );
 
   await StudentProfile.findOneAndUpdate(
@@ -172,9 +222,12 @@ async function main() {
         year: currentStudent.year,
         careerMatch: currentStudent.careerMatch,
         matchedSector: currentStudent.matchedSector,
+        country: 'Nigeria',
+        // Demo pseudonym. Real participants get theirs when they consent.
+        participantCode: 'P-DEMO-001',
       },
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
   );
   console.log(`seeded student ${studentEmail}`);
 
@@ -193,10 +246,30 @@ async function main() {
           published: true,
         },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
     );
   }
   console.log(`seeded ${opportunities.length} opportunities`);
+
+  // ── Verified resources (the prompt allow-list) ────────────────────────────
+  for (const r of catalogue.resources) {
+    await VerifiedResource.findOneAndUpdate(
+      { name: r.name },
+      {
+        $set: {
+          organisation: r.organisation,
+          sector: r.sector,
+          type: r.type,
+          countries: r.countries,
+          url: r.url,
+          isActive: true,
+        },
+        $setOnInsert: { verifiedAt: new Date() },
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true },
+    );
+  }
+  console.log(`seeded ${catalogue.resources.length} verified resources`);
 
   await mongoose.disconnect();
   console.log('\ndone');

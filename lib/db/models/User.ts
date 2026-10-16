@@ -11,6 +11,8 @@ export interface IUser {
   image?: string;
   /** bcrypt hash. `select: false`, so it is never returned unless asked for. */
   passwordHash?: string;
+  /** Google account id ("sub"), set when the user signs in with Google. */
+  googleId?: string;
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
@@ -36,6 +38,7 @@ const UserSchema = new Schema<IUser>(
     emailVerified: { type: Date, default: null },
     image: { type: String },
     passwordHash: { type: String, select: false },
+    googleId: { type: String, unique: true, sparse: true },
     role: {
       type: String,
       enum: ['student', 'mentor', 'admin'],

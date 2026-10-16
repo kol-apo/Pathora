@@ -1,0 +1,456 @@
+import Link from 'next/link';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BarChart3,
+  Check,
+  Cpu,
+  Palette,
+  Quote,
+  Rocket,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react';
+import Guide from '@/components/brand/Guide';
+import Avatar from '@/components/ui/Avatar';
+import Badge from '@/components/ui/Badge';
+import type { Consultant, Sector } from '@/lib/types';
+import { SECTORS } from '@/lib/types';
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Shared
+   ────────────────────────────────────────────────────────────────────────── */
+
+function SectionHeader({
+  eyebrow,
+  title,
+  intro,
+  light = false,
+}: {
+  eyebrow: string;
+  title: string;
+  intro?: string;
+  light?: boolean;
+}) {
+  return (
+    <div className="max-w-2xl">
+      <p
+        className={`flex items-center gap-2.5 text-micro font-semibold uppercase ${
+          light ? 'text-sky' : 'text-navy'
+        }`}
+      >
+        <span className="h-[3px] w-6 rounded-full bg-sky" aria-hidden="true" />
+        {eyebrow}
+      </p>
+      <h2
+        className={`mt-4 text-[30px] font-bold leading-[1.1] tracking-[-0.03em] md:text-[40px] ${
+          light ? 'text-white' : 'text-ink'
+        }`}
+      >
+        {title}
+      </h2>
+      {intro && (
+        <p className={`mt-3 text-base leading-relaxed ${light ? 'text-white/70' : 'text-muted'}`}>{intro}</p>
+      )}
+    </div>
+  );
+}
+
+/** A tinted stage that frames a small slice of real product UI. */
+function Stage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative flex h-[220px] items-center justify-center overflow-hidden rounded-xl border border-sky-muted bg-sky-soft p-5">
+      <div
+        className="pointer-events-none absolute inset-0 [background-image:radial-gradient(rgba(29,63,90,0.09)_1px,transparent_1px)] [background-size:18px_18px]"
+        aria-hidden="true"
+      />
+      <div className="relative w-full transition-transform duration-500 ease-out group-hover:-translate-y-1 group-hover:scale-[1.02]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   How it works
+   ────────────────────────────────────────────────────────────────────────── */
+
+function ChatVignette() {
+  return (
+    <div className="flex flex-col gap-2.5" aria-hidden="true">
+      <div className="flex items-end gap-2">
+        <Guide size={40} track={false} />
+        <p className="rounded-2xl rounded-bl-md border border-sky-muted bg-white px-3.5 py-2.5 text-[13px] leading-snug text-ink shadow-card">
+          What do people come to you for?
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-end gap-1.5">
+        <span className="flex items-center gap-1 rounded-full bg-navy px-3 py-1.5 text-[12px] text-white">
+          <Check size={12} strokeWidth={2.5} />
+          Figuring out why things break
+        </span>
+        <span className="rounded-full border border-sky-muted bg-white px-3 py-1.5 text-[12px] text-ink">
+          Creative ideas
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PathVignette() {
+  return (
+    <div className="rounded-xl border border-sky-muted bg-white p-4 shadow-card" aria-hidden="true">
+      <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">Your strongest match</p>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <p className="text-[14.5px] font-semibold tracking-[-0.01em] text-ink">Data Science &amp; Analytics</p>
+        <Badge variant="sector">Technology</Badge>
+      </div>
+      <ol className="mt-3 space-y-2">
+        {[
+          ['Year 1', 'Build the foundations', true],
+          ['Year 2', 'Ship real analysis', false],
+          ['Year 3', 'Own a domain', false],
+        ].map(([year, label, current]) => (
+          <li key={year as string} className="flex items-center gap-2.5 text-[12px]">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                current ? 'bg-navy text-white' : 'bg-sky-soft text-navy'
+              }`}
+            >
+              {(year as string).slice(-1)}
+            </span>
+            <span className={current ? 'font-medium text-ink' : 'text-muted'}>{label}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function BookVignette({ consultant: c }: { consultant: Consultant }) {
+  return (
+    <div className="rounded-xl border border-sky-muted bg-white p-4 shadow-card" aria-hidden="true">
+      <div className="flex items-center gap-2.5">
+        <Avatar initials={c.initials} size="xs" />
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold text-ink">{c.name}</p>
+          <p className="truncate text-[11.5px] text-muted">{c.role}</p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
+        {['10:00', '11:00', '15:00'].map((t, i) => (
+          <span
+            key={t}
+            className={`rounded-md border py-1.5 text-center text-[12px] font-medium ${
+              i === 1 ? 'border-navy bg-navy text-white' : 'border-line text-ink'
+            }`}
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+      <span className="mt-2.5 block rounded-md bg-navy py-2 text-center text-[12px] font-medium text-white">
+        Book Wed, 11:00
+      </span>
+    </div>
+  );
+}
+
+export function HowItWorks({ consultant }: { consultant: Consultant }) {
+  const steps = [
+    {
+      title: 'Chat with the Guide',
+      body: 'Six quick questions in a friendly conversation. It reads who you actually are, not what sounds impressive on paper.',
+      visual: <ChatVignette />,
+    },
+    {
+      title: 'See the path that fits',
+      body: 'A career direction matched to your answers, with a three-year roadmap built for the African job market.',
+      visual: <PathVignette />,
+    },
+    {
+      title: 'Talk to someone doing it',
+      body: 'Every result ends with vetted professionals in that field. Book a free video call and ask them everything.',
+      visual: <BookVignette consultant={consultant} />,
+    },
+  ];
+
+  return (
+    <section id="how-it-works" className="border-t border-line px-5 py-24 md:px-10">
+      <SectionHeader
+        eyebrow="How it works"
+        title="From not sure to talking to someone, in three steps"
+      />
+
+      <ol className="relative mt-14 grid gap-6 md:grid-cols-3">
+        {/* The path linking the three steps */}
+        <span
+          className="absolute left-[16%] right-[16%] top-[258px] hidden h-0 border-t-2 border-dashed border-sky md:block"
+          aria-hidden="true"
+        />
+        {steps.map((s, i) => (
+          <li key={s.title} className="group relative flex flex-col">
+            <Stage>{s.visual}</Stage>
+            <span className="relative z-10 mx-auto mt-5 flex h-9 w-9 items-center justify-center rounded-full border-4 border-white bg-navy text-[13px] font-semibold text-white shadow-card md:mx-auto">
+              {i + 1}
+            </span>
+            <h3 className="mt-4 text-center text-lg font-semibold tracking-[-0.01em] text-ink">{s.title}</h3>
+            <p className="mx-auto mt-2 max-w-[320px] text-center text-sm leading-relaxed text-muted">{s.body}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Sectors
+   ────────────────────────────────────────────────────────────────────────── */
+
+const SECTOR_DETAILS: Record<Sector, { icon: LucideIcon; blurb: string; roles: string[] }> = {
+  Entrepreneurship: {
+    icon: Rocket,
+    blurb: 'Founders, marketers and operators building companies across the continent.',
+    roles: ['Founder', 'Growth marketer', 'Operations lead'],
+  },
+  Technology: {
+    icon: Cpu,
+    blurb: 'Engineering, product and data at startups and global technology companies.',
+    roles: ['Software engineer', 'Product manager', 'Data analyst'],
+  },
+  Finance: {
+    icon: BarChart3,
+    blurb: 'Investment banking, Big 4 and audit, including what the textbooks leave out.',
+    roles: ['Investment analyst', 'Auditor', 'Risk analyst'],
+  },
+  Creative: {
+    icon: Palette,
+    blurb: 'Design, film and content, plus the business side nobody teaches you.',
+    roles: ['Product designer', 'Filmmaker', 'Content strategist'],
+  },
+};
+
+export function Sectors({ consultants }: { consultants: Consultant[] }) {
+  return (
+    <section className="border-t border-line bg-gradient-to-b from-sky-soft/70 to-white px-5 py-24 md:px-10">
+      <SectionHeader
+        eyebrow="Sectors"
+        title="Four sectors. Real professionals."
+        intro="Every consultant works in the industry today. No theorists, no career coaches who have never done the job."
+      />
+
+      <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {SECTORS.map((name) => {
+          const { icon: Icon, blurb, roles } = SECTOR_DETAILS[name];
+          const people = consultants.filter((c) => c.sector === name);
+          return (
+            <Link
+              key={name}
+              href={`/explore?sector=${encodeURIComponent(name)}`}
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-sky-muted bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-navy hover:shadow-raised"
+            >
+              {/* A soft sky shape in the corner, echoing the Guide */}
+              <span
+                className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-[58%_42%_46%_54%/52%_48%_52%_48%] bg-sky-soft transition-transform duration-500 group-hover:scale-125"
+                aria-hidden="true"
+              />
+              <div className="relative flex items-start justify-between">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy text-white">
+                  <Icon size={20} strokeWidth={1.75} />
+                </span>
+                <ArrowUpRight
+                  size={18}
+                  className="text-faint transition duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-navy"
+                />
+              </div>
+              <h3 className="relative mt-6 text-lg font-semibold tracking-[-0.01em] text-ink">{name}</h3>
+              <p className="relative mt-2 text-sm leading-relaxed text-muted">{blurb}</p>
+              <div className="relative mt-5 flex flex-wrap gap-1.5">
+                {roles.map((r) => (
+                  <span key={r} className="rounded-full bg-sky-soft px-2.5 py-1 text-[12px] text-navy">
+                    {r}
+                  </span>
+                ))}
+              </div>
+              <div className="relative mt-auto pt-6">
+              <div className="flex items-center justify-between border-t border-line pt-5">
+                <div className="flex -space-x-1.5">
+                  {people.slice(0, 3).map((c) => (
+                    <span
+                      key={c.id}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-soft text-[10.5px] font-semibold text-navy ring-[3px] ring-white"
+                    >
+                      {c.initials}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-[13px] font-medium text-navy">
+                  {people.length} consultant{people.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Testimonials
+   ────────────────────────────────────────────────────────────────────────── */
+
+const STORIES = [
+  {
+    quote:
+      'My consultant reviewed my Big 4 application line by line. I got the internship. Nothing else came close.',
+    outcome: 'Got the internship',
+    name: 'Salma B.',
+    role: 'Accounting, University of Ghana',
+    initials: 'SB',
+  },
+  {
+    quote:
+      'I spent two years guessing what finance careers looked like. One session with a real analyst gave me more clarity than all of it.',
+    outcome: 'Clarity on finance',
+    name: 'Chiamaka U.',
+    role: 'Economics, University of Nigeria',
+    initials: 'CU',
+  },
+  {
+    quote:
+      'The questionnaire pointed me at product design, then showed me three designers to talk to. That bridge is the whole thing.',
+    outcome: 'Matched to product design',
+    name: 'Yannick H.',
+    role: 'Computer Science, ALU Rwanda',
+    initials: 'YH',
+  },
+];
+
+export function Testimonials() {
+  const [featured, ...rest] = STORIES;
+  return (
+    <section id="about" className="border-t border-line px-5 py-24 md:px-10">
+      <SectionHeader eyebrow="Student stories" title="Students are already ahead" />
+
+      <div className="mt-14 grid gap-5 lg:grid-cols-12">
+        <figure className="relative flex flex-col justify-between overflow-hidden rounded-2xl bg-navy p-8 text-white md:p-10 lg:col-span-7">
+          <svg
+            viewBox="0 0 400 200"
+            className="pointer-events-none absolute -bottom-6 -right-6 w-[70%] opacity-30"
+            aria-hidden="true"
+          >
+            <path d="M10 190 C 120 170, 170 120, 230 90 S 340 30, 390 10" fill="none" stroke="#96CAD3" strokeWidth={26} strokeLinecap="round" />
+          </svg>
+          <div className="relative">
+            <Quote size={40} className="fill-sky text-sky" aria-hidden="true" />
+            <span className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] font-medium text-sky">
+              <Check size={13} strokeWidth={2.5} />
+              {featured.outcome}
+            </span>
+            <blockquote className="mt-5 max-w-xl text-[22px] font-medium leading-[1.4] tracking-[-0.01em] md:text-[26px]">
+              {featured.quote}
+            </blockquote>
+          </div>
+          <figcaption className="relative mt-10 flex items-center gap-3">
+            <Avatar initials={featured.initials} size="sm" tone="dark" />
+            <div>
+              <p className="text-sm font-semibold">{featured.name}</p>
+              <p className="text-[12.5px] text-white/60">{featured.role}</p>
+            </div>
+          </figcaption>
+        </figure>
+
+        <div className="grid gap-5 lg:col-span-5">
+          {rest.map((t) => (
+            <figure
+              key={t.name}
+              className="flex flex-col rounded-2xl border border-sky-muted bg-white p-7 transition duration-300 hover:-translate-y-0.5 hover:shadow-raised"
+            >
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-sky-soft px-3 py-1 text-[12px] font-medium text-navy">
+                <Check size={13} strokeWidth={2.5} />
+                {t.outcome}
+              </span>
+              <blockquote className="mt-4 text-[15.5px] leading-relaxed text-ink">{t.quote}</blockquote>
+              <figcaption className="mt-6 flex items-center gap-3">
+                <Avatar initials={t.initials} size="sm" />
+                <div>
+                  <p className="text-sm font-medium text-ink">{t.name}</p>
+                  <p className="text-[12.5px] text-muted">{t.role}</p>
+                </div>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Closing call to action
+   ────────────────────────────────────────────────────────────────────────── */
+
+export function ClosingCta() {
+  return (
+    <section className="px-5 pb-24 md:px-10">
+      <div className="on-dark relative overflow-hidden rounded-[28px] bg-navy p-10 md:p-16">
+        <svg
+          viewBox="0 0 800 300"
+          preserveAspectRatio="none"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          aria-hidden="true"
+        >
+          <path
+            d="M-20 330 C 180 300, 330 230, 470 170 S 690 60, 830 20"
+            fill="none"
+            stroke="#96CAD3"
+            strokeOpacity={0.22}
+            strokeWidth={46}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+
+        <div className="relative flex flex-col items-start gap-10 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="max-w-2xl text-[30px] font-bold leading-[1.1] tracking-[-0.03em] text-white md:text-[42px]">
+              Stop guessing. Start asking people who already made it.
+            </h2>
+            <p className="mt-4 flex items-center gap-2 text-[14px] text-white/65">
+              <ShieldCheck size={15} strokeWidth={1.75} className="text-sky" />
+              Every consultant is vetted by the Pathora team. Sessions are free.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/explore"
+                className="group flex items-center gap-2 rounded bg-white px-6 py-3.5 text-sm font-medium text-navy transition-colors hover:bg-sky-soft"
+              >
+                Find a consultant
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+              <Link
+                href="/discover"
+                className="rounded border border-white/25 px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+              >
+                Chat with the Guide
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative hidden shrink-0 flex-col items-center md:flex" aria-hidden="true">
+            <p className="mb-4 rounded-2xl rounded-br-md bg-white px-4 py-2.5 text-[13.5px] font-medium text-navy shadow-raised">
+              Ready when you are.
+            </p>
+            {/* A soft sky glow so the navy Guide stands out on the navy band */}
+            <div className="relative">
+              <span className="absolute inset-[-18%] rounded-full bg-sky/35 blur-2xl" />
+              <Guide size={112} className="relative" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

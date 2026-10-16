@@ -40,5 +40,7 @@ export function toConsultant(m: MentorDTO): Consultant {
     rating: m.ratingAvg,
     nextSlot: nextSlotLabel(m.nextSlotAt),
     helpWith: m.helpWith,
+    socials: m.socials,
+    links: m.links,
   };
 }

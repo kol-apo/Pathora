@@ -22,7 +22,7 @@ export default function SectorFilter({
             aria-pressed={isActive}
             className={`rounded-full px-4 py-[9px] text-[13.5px] font-medium transition-colors duration-150 ${
               isActive
-                ? 'bg-ink-soft text-white'
+                ? 'bg-navy text-white'
                 : 'border border-line bg-white text-ink hover:bg-surface'
             }`}
           >

@@ -1,0 +1,101 @@
+{
+  "_comment": "The verified resource catalogue: the allow-list behind the prompt guardrails. Read by scripts/seed.ts (into the VerifiedResource collection) and by prompts/validate_prompt.py. Where the exact programme page was not certain, url is the organisation's homepage; confirm each before the study starts. sector null = open to every sector; countries [] = no country restriction.",
+  "resources": [
+    {
+      "name": "Tony Elumelu Foundation Entrepreneurship Programme",
+      "organisation": "Tony Elumelu Foundation",
+      "sector": "Entrepreneurship",
+      "type": "fellowship",
+      "countries": [],
+      "url": "https://www.tonyelumelufoundation.org"
+    },
+    {
+      "name": "ALX Software Engineering Programme",
+      "organisation": "ALX Africa",
+      "sector": "Technology",
+      "type": "scholarship",
+      "countries": [],
+      "url": "https://www.alxafrica.com"
+    },
+    {
+      "name": "Google Africa Developer Scholarship",
+      "organisation": "Google",
+      "sector": "Technology",
+      "type": "scholarship",
+      "countries": [],
+      "url": "https://developers.google.com"
+    },
+    {
+      "name": "Andela Technical Leadership Programme",
+      "organisation": "Andela",
+      "sector": "Technology",
+      "type": "fellowship",
+      "countries": [],
+      "url": "https://andela.com"
+    },
+    {
+      "name": "Mastercard Foundation Scholars Programme",
+      "organisation": "Mastercard Foundation",
+      "sector": null,
+      "type": "scholarship",
+      "countries": [],
+      "url": "https://mastercardfdn.org"
+    },
+    {
+      "name": "Moniepoint Campus Ambassador Programme",
+      "organisation": "Moniepoint",
+      "sector": "Finance",
+      "type": "ambassador_programme",
+      "countries": ["Nigeria"],
+      "url": "https://moniepoint.com"
+    },
+    {
+      "name": "PwC Africa Graduate Programme",
+      "organisation": "PwC",
+      "sector": "Finance",
+      "type": "graduate_programme",
+      "countries": ["Nigeria", "Ghana", "Kenya", "Rwanda", "South Africa"],
+      "url": "https://www.pwc.com"
+    },
+    {
+      "name": "Standard Bank Graduate Programme",
+      "organisation": "Standard Bank Group",
+      "sector": "Finance",
+      "type": "graduate_programme",
+      "countries": ["South Africa", "Kenya", "Uganda", "Ghana", "Nigeria"],
+      "url": "https://www.standardbank.com"
+    },
+    {
+      "name": "AWS Build On Africa",
+      "organisation": "Amazon Web Services",
+      "sector": "Technology",
+      "type": "hackathon",
+      "countries": [],
+      "url": "https://aws.amazon.com"
+    },
+    {
+      "name": "Notion Campus Leader Programme",
+      "organisation": "Notion",
+      "sector": "Technology",
+      "type": "ambassador_programme",
+      "countries": [],
+      "url": "https://www.notion.com"
+    },
+    {
+      "name": "MultiChoice Talent Factory",
+      "organisation": "MultiChoice Group",
+      "sector": "Creative",
+      "type": "fellowship",
+      "countries": ["Nigeria", "Kenya", "Zambia"],
+      "url": "https://www.multichoice.com"
+    },
+    {
+      "name": "Nigerian Film Corporation Training Programme",
+      "organisation": "Nigerian Film Corporation",
+      "sector": "Creative",
+      "type": "fellowship",
+      "countries": ["Nigeria"],
+      "url": "https://nfc.gov.ng"
+    }
+  ]
+}

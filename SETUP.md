@@ -1,160 +1,110 @@
-# Setting up the research schema and test harness
+# Setting up the data layer and the checks
 
-This guide covers `schema.sql`, `demo.sh` and `prompts/validate_prompt.py`. To run the Next.js application itself, see the [README](README.md#running-the-application).
+This guide covers the database, the test suites, the research reports, and the prompt validator. For the app itself, see the [README](README.md#running-the-application).
 
-You need:
+Pathora runs on **MongoDB**, through the Mongoose models in `lib/db/models/`. The readable schema is [docs/data-model.md](docs/data-model.md).
 
-- **PostgreSQL 16** (15 or newer works: the views use `security_invoker`) and its `psql` client.
-- **bash**: built in on macOS and Linux; on Windows use Git Bash or WSL.
-- **Python 3.9+** with `jsonschema`, for the prompt validator only.
+## 1. A MongoDB database
 
-Pick one of the five paths below, then run:
+You need a MongoDB 7 or newer database. Either option works.
+
+**MongoDB Atlas (recommended, free).**
+1. Create a free **M0** cluster at mongodb.com/atlas.
+2. Under **Database & Network Access**, add a database user, and add `0.0.0.0/0` to the IP access list. Without that entry, connections fail whenever your IP address changes.
+3. Click **Connect**, then **Drivers**, and copy the connection string.
+
+**Local, with Docker.**
+```bash
+docker run --name pathora-mongo -p 27017:27017 -d mongo:7
+```
+The connection string is then `mongodb://localhost:27017/pathora`.
+
+## 2. Configure
 
 ```bash
-./demo.sh                            # builds the schema from scratch and runs all three suites
-python3 prompts/validate_prompt.py   # validates the prompt specification; no database needed
+cp .env.example .env.local
 ```
 
-`demo.sh` drops and recreates the target database (default name `pathora`). It refuses to drop an existing database that does not look like a previous Pathora demo database, unless you set `PATHORA_FORCE_DROP=1`. Point it at a dedicated database, never one holding real participant data.
+Set `MONGODB_URI` in `.env.local`. For Atlas, put the database name `pathora` before the `?`:
 
-## Path 1: Docker (any operating system)
+```
+MONGODB_URI="mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/pathora?retryWrites=true&w=majority&appName=Cluster0"
+```
+
+Also set `AUTH_SECRET` to a long random string; `.env.example` has a command that generates one. For "Continue with Google", add `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` from Google Cloud Console (redirect URI `http://localhost:3000/api/auth/callback/google`).
+
+`.env.local` is gitignored. The app and the scripts all read it.
+
+## 3. Load the data
 
 ```bash
-docker run --name pathora-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:16
-export PGPASSWORD=postgres
-./demo.sh
+npm install
+npm run seed            # add -- --fresh to wipe every collection first
 ```
 
-`demo.sh` needs a `psql` client on your machine. Without one, run everything inside the container instead:
+This creates:
+- an admin;
+- 12 approved mentors, three per sector, each with weekly hours and an interest vector;
+- the demo student;
+- 6 opportunities;
+- the 12 verified resources.
+
+It also builds every index. That step is required: the unique index on bookings is what stops two students taking one slot, and it only works once it exists in the database.
+
+## 4. Run the checks
 
 ```bash
-docker cp . pathora-pg:/pathora
-docker exec -it -w /pathora pathora-pg bash ./demo.sh
+npm run verify          # 192 offline checks; no database, network or API key needed
+npm run verify:db       # 26 checks against the database in MONGODB_URI
+python3 prompts/validate_prompt.py   # 36 checks on the prompt specification
 ```
 
-## Path 2: macOS with Homebrew
+For the prompt validator, run `pip install -r prompts/requirements.txt` once first.
+
+`verify:db` creates its own test records, tagged with a run marker, and deletes them at the end, so it is safe to run against a seeded database. It never touches the seeded data.
+
+## 5. Become an admin
+
+Sign up on the site with your own email, then promote that account:
 
 ```bash
-brew install postgresql@16
-brew services start postgresql@16
-export PATH="$(brew --prefix postgresql@16)/bin:$PATH"
-export PGUSER="$(whoami)"     # Homebrew creates a superuser named after you, not "postgres"
-./demo.sh
+npm run make-admin -- you@example.com
 ```
 
-## Path 3: Ubuntu or WSL
+Sign out and back in. **Dashboard** now opens the admin console at `/admin`, where mentor applications are reviewed.
+
+## 6. Research reports
 
 ```bash
-sudo apt update
-sudo apt install -y postgresql-16 postgresql-contrib-16
-sudo service postgresql start
-sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
-export PGPASSWORD=postgres
-./demo.sh
+npm run report
 ```
 
-If `apt` cannot find `postgresql-16`, add the PostgreSQL project's apt repository first (see postgresql.org/download/linux/ubuntu), or use the version your distribution ships, provided it is 15 or newer.
+Prints the bridge conversion funnel per sector, output validity per prompt version, and session completion. It is read-only. See [docs/data-model.md](docs/data-model.md#research-reports).
 
-## Path 4: Windows (Git Bash)
+## What each check proves
 
-Install PostgreSQL 16 with the EDB installer from postgresql.org, which includes `psql` and the required extensions. Then, in Git Bash:
+### `npm run verify` (offline)
 
-```bash
-export PATH="/c/Program Files/PostgreSQL/16/bin:$PATH"
-export PGPASSWORD='the password you chose in the installer'
-bash demo.sh
-```
+| Area | What it proves |
+| --- | --- |
+| Slots and timezones | Open times are generated correctly from weekly hours, across timezones and daylight-saving changes |
+| Cosine similarity | Identical interests score 1; a long-answer student and a short-answer student with the same interests score the same; a zero vector gives no score instead of dividing by zero |
+| Bridge ranking | The top three are returned nearest first; ties break the same way every time; mentors without a vector are left out |
+| Mentor approval | An approval must name the admin; `vetted` cannot be set by hand; vectors must be exactly 5 numbers from 0 to 1 |
+| Provenance | A discovery result without a prompt version is rejected |
+| Bridge records | A bridge booking must name its result; ranks stop at 3; a booking cannot come before the view |
+| Research privacy | Analytics events have no user field and refuse any extra field; video sessions have no recording field |
+| AI output | Discovery output is validated, and the offline fallback always produces a result |
 
-On Windows, start the scripts with `bash demo.sh` rather than `./demo.sh`, because Windows does not keep the executable bit. If another PostgreSQL is already using port 5432, set `PGPORT` to the port the installer chose.
+### `npm run verify:db` (live database)
 
-## Path 5: Supabase SQL Editor
+| Area | What it proves |
+| --- | --- |
+| Double booking | The unique index exists; five students booking one slot at once gives exactly one booking, and the other four get a clean "slot taken" |
+| Slots | A cancelled booking frees its slot; a taken slot stops being offered; a 3am booking is refused |
+| The bridge | A result surfaces exactly three approved mentors in its own sector, ranked exactly as an independent recalculation predicts; a repeat call returns the same three; another student cannot surface it |
+| Bridge bookings | Booking a mentor from another sector through the bridge is refused; a valid bridge booking stamps `bookedAt`; the funnel report counts it |
+| Access | The owner can read a result. Another student cannot. A mentor surfaced but not booked cannot. The booked mentor can, but never sees the student's answers |
+| Research events | An event is stored under the participant code with no user field |
 
-1. Open your project's **SQL Editor**, paste the whole of `schema.sql`, and run it. It detects that Supabase already provides the `auth` schema and the `authenticated` and `anon` roles, and skips its local stand-ins.
-2. Running it a second time is safe; every statement is idempotent.
-
-The SQL Editor runs one session at a time, so **`test_concurrency.sh` cannot run there**: it needs two sessions open at once. To run the test suites against Supabase, connect from your machine with the database connection details from **Project Settings → Database**:
-
-```bash
-export PGHOST=db.<project-ref>.supabase.co PGPORT=5432 PGUSER=postgres PGPASSWORD='...' PGDATABASE=postgres
-bash tests/db/test_bridge.sh
-bash tests/db/test_rls.sh
-bash tests/db/test_concurrency.sh
-```
-
-Do not run `demo.sh` against Supabase: it drops and recreates the database.
-
-## Environment variables
-
-Every script reads the standard PostgreSQL variables, so the same commands work with Docker, a local install or a remote server.
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `PGHOST` | `localhost` | Server host |
-| `PGPORT` | `5432` | Server port |
-| `PGUSER` | `postgres` | Role to connect as. Must be able to create databases and roles. |
-| `PGDATABASE` | `pathora` | Database that `demo.sh` recreates and the tests run in |
-| `PGPASSWORD` | none | Password, if the server requires one |
-| `PGMAINTDB` | `postgres` | Database `demo.sh` connects to while dropping and recreating `PGDATABASE` |
-| `PATHORA_FORCE_DROP` | unset | Set to `1` to let `demo.sh` drop a database that does not look like a Pathora demo database |
-
-## The prompt validator
-
-```bash
-pip install -r prompts/requirements.txt
-python3 prompts/validate_prompt.py
-```
-
-It needs no API key and makes no network call. It reads `prompts/discovery.json`, the fixtures in `prompts/fixtures/`, and the resource catalogue from the seed in `schema.sql`. What it proves is described in [prompts/README.md](prompts/README.md).
-
-## What each test proves
-
-### `test_concurrency.sh`: two students cannot book one slot
-
-Amara opens a transaction, books a slot and holds it for two seconds before committing. Kwame requests the same slot 0.3 seconds later. Every line is prefixed `[Amara]` or `[Kwame]` and stamped with the database server's clock, and the two sessions' output is merged in time order, so the interleaving is shown as it happened:
-
-```
-22:48:52.312  [Amara] BEGIN
-22:48:52.315  [Amara] booked the slot: booking 00a8ae40-...
-22:48:52.347  [Amara] holding the row lock for 2 seconds...
-22:48:52.671  [Kwame] requesting the same slot (waits on the row lock)
-22:48:54.358  [Amara] still holding, about to commit
-22:48:54.360  [Amara] COMMIT: lock released
-22:48:54.362  [Kwame] SLOT_UNAVAILABLE: slot e0000000-... is no longer available
-```
-
-Kwame's request waits on Amara's row lock for about 1.7 seconds and is refused within milliseconds of her commit. Afterwards exactly one booking exists and the slot is `booked`.
-
-The double-booking defence has three layers, and the suite then tests each one alone:
-
-| Layer | Mechanism | What the test does |
-| --- | --- | --- |
-| Procedural | `book_consultation()` locks the slot row with `SELECT ... FOR UPDATE`, so a second caller waits, re-reads the row and sees it taken | The race above |
-| Declarative | The partial unique index `bookings_one_live_booking_per_slot` allows one non-cancelled booking per slot, however the row is written | Inserts a second booking directly, bypassing the function; the index rejects it |
-| Structural | The exclusion constraint `no_overlapping_slots` stops one consultant having two overlapping slots, so the same hour cannot exist twice | Inserts an overlapping slot; the constraint rejects it |
-
-Any one layer is enough on its own. All three exist because a double booking cannot be fixed once two students arrive for one call. The last check cancels the booking and books the slot again, proving cancellation releases it.
-
-### `test_bridge.sh`: every roadmap reaches three people in its sector
-
-It seeds four Technology consultants with different vectors, and only two Finance consultants.
-
-- The Technology roadmap surfaces exactly three Technology consultants, ranked by cosine similarity, with the two closest vectors first.
-- The Finance roadmap raises `INSUFFICIENT_CONSULTANTS` instead of quietly returning two.
-- A bridge booking of a Finance consultant against the Technology roadmap raises `BRIDGE_SECTOR_MISMATCH`.
-- A valid bridge booking stamps `booked_at` on the recommendation.
-- `v_bridge_funnel` reports the conversion rate per sector: 100% for Technology, 0% for Finance.
-
-### `test_rls.sh`: one participant cannot see another's data
-
-Every check runs as the `authenticated` role with a JWT subject set, which is exactly how Supabase runs a signed-in user's request.
-
-- Student A sees 1 of the 2 roadmaps: their own.
-- Student B sees none of student A's questionnaire answers.
-- A consultant with no booking sees no roadmaps.
-- Student A's attempt to insert a roadmap for student B is rejected by row-level security.
-- The approved consultant is visible in the directory; a pending one is not.
-
-Two further checks guard against false passes:
-
-- **Positive control:** after a booking, the consultant sees exactly that one roadmap, so the "sees 0" result above is not vacuous.
-- **Approval guard:** a pending consultant can edit their profile but cannot approve themselves.
+If any sector has fewer than three approved mentors, `verify:db` also checks that the bridge refuses with `INSUFFICIENT_CONSULTANTS`. With the standard seed every sector has three, so this case is covered offline instead.

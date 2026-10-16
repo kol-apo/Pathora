@@ -29,6 +29,8 @@ export interface MentorDTO {
   ratingAvg: number;
   ratingCount: number;
   sessionCount: number;
+  socials: { linkedin?: string; x?: string };
+  links: { kind: 'portfolio' | 'publication' | 'video' | 'website'; url: string; title?: string }[];
   /**
    * Start of the soonest bookable slot (ISO, UTC), or null when nothing is
    * open. Only present on reads that compute it — it is derived from the
@@ -57,9 +59,19 @@ export interface BookingDTO {
   startsAt: string;
   endsAt: string;
   status: BookingStatus;
-  roomUrl?: string;
+  discoveryResult?: string;
+  viaBridge: boolean;
   notes: BookingNoteDTO[];
   rating?: { score: number; comment?: string };
+}
+
+export interface BridgeRecommendationDTO {
+  mentorId: string;
+  rank: number;
+  similarity: number;
+  surfacedAt: string;
+  viewedAt: string | null;
+  bookedAt: string | null;
 }
 
 export interface OpportunityDTO {
@@ -97,6 +109,8 @@ export function toMentorDTO(doc: any): MentorDTO {
     ratingAvg: doc.ratingAvg ?? 0,
     ratingCount: doc.ratingCount ?? 0,
     sessionCount: doc.sessionCount ?? 0,
+    socials: { linkedin: doc.socials?.linkedin || undefined, x: doc.socials?.x || undefined },
+    links: (doc.links ?? []).map((l: any) => ({ kind: l.kind, url: l.url, title: l.title || undefined })),
   };
 }
 
@@ -115,7 +129,8 @@ export function toBookingDTO(doc: any): BookingDTO {
     startsAt: new Date(doc.startsAt).toISOString(),
     endsAt: new Date(doc.endsAt).toISOString(),
     status: doc.status,
-    roomUrl: doc.roomUrl,
+    discoveryResult: doc.discoveryResult ? id(doc.discoveryResult) : undefined,
+    viaBridge: !!doc.viaBridge,
     notes: (doc.notes ?? []).map((n: any) => ({
       body: n.body,
       author: id(n.author),
@@ -135,5 +150,16 @@ export function toOpportunityDTO(doc: any): OpportunityDTO {
     description: doc.description,
     url: doc.url,
     deadline: doc.deadline ? new Date(doc.deadline).toISOString() : null,
+  };
+}
+
+export function toBridgeRecommendationDTO(doc: any): BridgeRecommendationDTO {
+  return {
+    mentorId: id(doc.mentor),
+    rank: doc.rank,
+    similarity: doc.similarity,
+    surfacedAt: new Date(doc.surfacedAt).toISOString(),
+    viewedAt: doc.viewedAt ? new Date(doc.viewedAt).toISOString() : null,
+    bookedAt: doc.bookedAt ? new Date(doc.bookedAt).toISOString() : null,
   };
 }

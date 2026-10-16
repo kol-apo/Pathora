@@ -8,12 +8,12 @@
   }
 
   ::selection {
-    background: rgba(17, 17, 17, 0.12);
+    background: rgba(150, 202, 211, 0.45); /* sky */
   }
 
-  /* Focus ring reads as ink on light surfaces, white on the dark session room. */
+  /* Focus ring reads as navy on light surfaces, white on dark ones. */
   :focus-visible {
-    outline: 2px solid #111111;
+    outline: 2px solid #1d3f5a; /* navy */
     outline-offset: 2px;
   }
 

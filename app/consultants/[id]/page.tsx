@@ -10,6 +10,7 @@ import Badge from '@/components/ui/Badge';
 import { ToastStack, type ToastData } from '@/components/ui/Toast';
 import ConsultantCard from '@/components/consultant/ConsultantCard';
 import BookingPanel from '@/components/consultant/BookingPanel';
+import ProfileLinks from '@/components/consultant/ProfileLinks';
 import { toConsultant } from '@/lib/mentors';
 import type { MentorDTO } from '@/lib/db/queries/dto';
 import type { Consultant } from '@/lib/types';
@@ -147,6 +148,17 @@ export default function ConsultantProfilePage({ params }: { params: { id: string
 
             <p className="mt-7 max-w-2xl text-base leading-relaxed text-ink">{consultant.bio}</p>
 
+            {(consultant.socials?.linkedin || consultant.socials?.x || (consultant.links?.length ?? 0) > 0) && (
+              <section className="mt-10 max-w-2xl">
+                <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">
+                  Find {consultant.name.split(' ')[0]} online
+                </h2>
+                <div className="mt-4">
+                  <ProfileLinks name={consultant.name} socials={consultant.socials} links={consultant.links} />
+                </div>
+              </section>
+            )}
+
             <section className="mt-10">
               <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">
                 What I can help with
@@ -164,16 +176,18 @@ export default function ConsultantProfilePage({ params }: { params: { id: string
               </ul>
             </section>
 
-            <section className="mt-10">
-              <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">Expertise</h2>
-              <div className="mt-4 flex flex-wrap gap-[7px]">
-                {consultant.tags.map((tag) => (
-                  <Badge key={tag} variant="tag">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </section>
+            {consultant.tags.length > 0 && (
+              <section className="mt-10">
+                <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">Expertise</h2>
+                <div className="mt-4 flex flex-wrap gap-[7px]">
+                  {consultant.tags.map((tag) => (
+                    <Badge key={tag} variant="tag">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            )}
 
             <section className="mt-10">
               <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">Experience</h2>
@@ -186,7 +200,7 @@ export default function ConsultantProfilePage({ params }: { params: { id: string
                     />
                   )}
                   <span
-                    className="z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-ink"
+                    className="z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-navy"
                     aria-hidden="true"
                   />
                   <div>
@@ -287,14 +301,14 @@ function ProfileFallback({ state, onRetry }: { state: LoadState; onRetry: () => 
             {state === 'not-found' ? (
               <Link
                 href="/explore"
-                className="mt-6 inline-block rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+                className="mt-6 inline-block rounded bg-navy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
               >
                 Browse all consultants
               </Link>
             ) : (
               <button
                 onClick={onRetry}
-                className="mt-6 rounded bg-ink-soft px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-black"
+                className="mt-6 rounded bg-navy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
               >
                 Try again
               </button>

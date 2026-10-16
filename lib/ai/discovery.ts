@@ -1,5 +1,6 @@
 import type { DiscoveryAnswers } from '@/lib/discovery/questions';
 import { generateMockMatch } from './providers/mock';
+import { PROMPT_VERSION } from './prompt';
 import { resolveProvider, type DiscoveryProvider, type ProviderEnv } from './provider';
 import type { CareerMatch } from './schema';
 
@@ -109,5 +110,11 @@ export function toDiscoveryResultDoc(
     provider: outcome.provider,
     model: outcome.model,
     latencyMs: outcome.latencyMs,
+    promptVersion: PROMPT_VERSION,
+    // The offline fallback is a valid result, but it was not the model's output.
+    schemaValid: !outcome.usedFallback,
+    // Not yet reported by the provider, which retries internally (see
+    // providers/llm.ts). Recorded as 0 until the provider exposes its count.
+    retryCount: 0,
   };
 }

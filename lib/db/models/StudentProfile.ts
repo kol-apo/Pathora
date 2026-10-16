@@ -15,6 +15,18 @@ export interface IStudentProfile {
   matchedSector?: Sector;
   latestDiscovery?: Types.ObjectId;
 
+  country?: string;
+
+  /**
+   * Pseudonymous study code, e.g. "P-0042". The only identifier that appears in
+   * research data (AnalyticsEvent), so exports cannot be joined back to a name
+   * or email without this protected collection.
+   */
+  participantCode?: string;
+  /** Which version of the consent form the student agreed to, and when. */
+  consentVersion?: string;
+  consentedAt?: Date;
+
   savedMentors: Types.ObjectId[];
   savedOpportunities: Types.ObjectId[];
 
@@ -30,6 +42,12 @@ const StudentProfileSchema = new Schema<IStudentProfile>(
     university: { type: String, trim: true },
     field: { type: String, trim: true },
     year: { type: Number, min: 1, max: 8 },
+
+    country: { type: String, trim: true },
+
+    participantCode: { type: String, trim: true, unique: true, sparse: true },
+    consentVersion: { type: String },
+    consentedAt: { type: Date },
 
     careerMatch: { type: String },
     matchedSector: { type: String, enum: SECTORS },

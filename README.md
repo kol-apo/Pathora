@@ -2,55 +2,59 @@
 
 Most AI career tools for students stop at advice. Pathora treats advice as incomplete until it reaches a person, and enforces that in its architecture rather than in its interface copy: every generated roadmap ends in a mandatory bridge to three vetted professionals in the recommended sector.
 
-This repository holds two things: the Next.js application (consultant browsing and booking, and the career discovery questionnaire), and the research data layer for the study, `schema.sql` and `prompts/`, each with its own test harness.
+Pathora is a Next.js application on **MongoDB**. The same database holds the application's data and the research data the study collects. The schema is documented in [docs/data-model.md](docs/data-model.md), and the AI prompt is specified and validated in [prompts/](prompts/).
 
 ## Three architectural questions
 
 | Question | Mechanism | Verified by |
 | --- | --- | --- |
-| What stops two students booking one slot? | Three independent layers. `book_consultation()` locks the slot row (`SELECT ... FOR UPDATE`). The partial unique index `bookings_one_live_booking_per_slot` allows one live booking per slot. The exclusion constraint `no_overlapping_slots` makes overlapping slots for one consultant impossible. | `tests/db/test_concurrency.sh`: two sessions race for one slot; then each layer is tested on its own. |
-| How are consultants matched, and why that metric? | `surface_bridge_consultants()` ranks approved consultants in the roadmap's sector only, by cosine similarity between the student's vector and each consultant's vector, and records the top three. Cosine is magnitude-invariant, so a student who writes long answers is not scored as closer to everyone than a student who writes short ones; only the direction of their interests counts. | `tests/db/test_bridge.sh`: ranking, the under-staffed sector error, the sector guard on bridge bookings, and the conversion funnel. |
-| What stops one participant reading another's data? | Row-level security on all 13 tables (28 policies). Questionnaire answers are readable only by their author. A consultant can read a roadmap only if a booking links them to it. Functions that cross ownership check the caller's identity. Research analytics carry a pseudonymous `participant_code`, never a student id. | `tests/db/test_rls.sh`: every check runs as the `authenticated` role with a JWT subject, as a Supabase request would. |
+| What stops two students booking one slot? | Two layers. `createBooking()` regenerates the mentor's open slots and accepts only a real, free one. The unique index `one_active_booking_per_slot` then lets MongoDB accept only one active booking per mentor and start time, even if two requests pass the first check at the same instant. | `npm run verify:db`: five students book the same slot at once; exactly one succeeds and the rest get a clean "slot taken". |
+| How are consultants matched, and why that metric? | `surfaceBridgeConsultants()` ranks approved consultants in the result's sector only, by cosine similarity between the student's interest vector and each consultant's, and records the top three. Cosine compares only the direction of interests, so a student who writes long answers is not scored as closer to everyone than one who writes short answers. | `npm run verify` (the ranking maths) and `npm run verify:db` (ranking against the live database matches an independent recalculation, the sector guard, the conversion funnel). |
+| What stops one participant reading another's data? | MongoDB has no row-level security, so access rules live in the data layer: participant data is read only through functions that take the caller's identity. A student reads only their own results; a mentor reads a result only with a booking linked to it, and never sees the student's answers. Research events carry a pseudonymous `participantCode` and have no user field at all. | `npm run verify:db` (owner, other student, unbooked and booked mentor) and `npm run verify` (analytics events refuse any identifier field). |
 
-Run all three suites with `./demo.sh`, and the prompt contract with `python prompts/validate_prompt.py`. [SETUP.md](SETUP.md) covers installation.
+Run the checks with `npm run verify` and `npm run verify:db`, the research reports with `npm run report`, and the prompt contract with `python prompts/validate_prompt.py`. [SETUP.md](SETUP.md) covers installation.
 
 ## Three design decisions worth reading first
 
-1. **The model proposes; the database matches.** The language model decides direction: a sector, a five-axis interest vector, a phased plan, and the questions to ask a human. It never chooses which human. The database ranks consultants deterministically from the vector, so the same roadmap always surfaces the same consultants, and any match can be reproduced and audited without re-running the model. See `layer_1_identity` in [prompts/discovery.json](prompts/discovery.json) and `surface_bridge_consultants()` in [schema.sql](schema.sql).
-2. **Hallucinated opportunities are structurally impossible, not just discouraged.** Programmes may only be named from `verified_resources`, a curated allow-list in the database. A post-generation validator rejects any roadmap that names a programme outside it, whether or not the programme exists. The validator reads the allow-list straight from the `schema.sql` seed, so the prompt and the database cannot drift apart.
-3. **Double-booking is defended three times over.** A row lock, a unique index and an exclusion constraint each prevent it alone. All three are present because a double booking is unrecoverable in front of a participant. Removing the lock in testing showed the unique index still holding: one booking survived, but the second student received a raw database error instead of the handled `SLOT_UNAVAILABLE`.
+1. **The model proposes; the database matches.** The language model decides direction: a sector, a five-axis interest vector, a phased plan, and the questions to ask a human. It never chooses which human. The server ranks consultants deterministically from the vector, so the same roadmap always surfaces the same consultants, and any match can be reproduced and audited without re-running the model. See `layer_1_identity` in [prompts/discovery.json](prompts/discovery.json) and `surfaceBridgeConsultants()` in [lib/db/queries/bridge.ts](lib/db/queries/bridge.ts).
+2. **Hallucinated opportunities are structurally impossible, not just discouraged.** Programmes may only be named from a curated allow-list, the `VerifiedResource` collection. A post-generation validator rejects any roadmap that names a programme outside it, whether or not the programme exists. The database and the validator both load the list from one file, [lib/research/verified-resources.json](lib/research/verified-resources.json), so they cannot drift apart.
+3. **Double-booking is defended twice, and the database has the final say.** Validation in code catches made-up or already-taken times; the unique index catches the race that validation cannot, two requests checking at the same instant. The second write fails inside MongoDB and becomes the handled `SLOT_TAKEN` response, so the student sees "Someone just booked that slot" rather than an error.
 
 ## Current state
 
 | Component | State |
 | --- | --- |
-| Next.js application | Built. Explore, consultant profiles, booking with slot selection, and the discovery questionnaire work. Runs on MongoDB (`lib/db/`). |
-| `schema.sql` (PostgreSQL / Supabase) | Written and tested: `./demo.sh` passes on local PostgreSQL 16. **Not yet deployed to Supabase.** |
-| `prompts/discovery.json` | Specified, and validated offline by `prompts/validate_prompt.py`. **No live API generation yet:** no code calls the Claude API with this specification. |
-| Application wired to `schema.sql` and `prompts/` | **Not yet.** The application still uses MongoDB and its own prompt in `lib/ai/prompt.ts`. Planned from Sprint 1. |
-| Sign-in, admin vetting screen, live video | Not built. The schema already supports vetting (`consultants.status`, `approved_by`) and session timing (`video_sessions`). |
+| Next.js application | Built. Explore, consultant profiles, booking with slot selection, and Career Discovery (a chat with the Pathora Guide) work, reading and writing MongoDB. |
+| Data layer (MongoDB) | Built and tested: 11 collections, the bridge, access rules and research reports. `npm run verify` (178 checks) and `npm run verify:db` (26 checks) pass. |
+| Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. |
+| Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
+| Admin console (`/admin`) | Built: platform counts and the research reports, and mentor review (approve with an interest profile, reject, suspend, reinstate). |
+| `prompts/discovery.json` | Specified, and validated offline by `prompts/validate_prompt.py`. **No live generation yet:** no code calls the Claude API with this specification. |
+| Discovery wired to the research data | **Not yet.** Career Discovery still uses its own prompt (`lib/ai/prompt.ts`), does not save results (that needs sign-in), and produces no interest vector, so the bridge cannot run from the app yet. The results page still shows sample consultants. |
+| Live video | Not built. The data model already records session timing (`VideoSession`); the session room is still a mock-up. |
+| Student dashboard | Shows the signed-in student's name, but its figures are still sample data. |
+| Consent wording | Placeholder, marked as a draft on screen, until the approved consent form is added to `lib/research/consent.ts`. |
 | Deployment | Not deployed. See [Deployment plan](#deployment-plan). |
 
 ## Known discrepancies
 
-- **Stack.** The running application uses MongoDB; `schema.sql` targets PostgreSQL on Supabase. Until one is chosen and the other retired, booking and matching logic exists in both forms.
-- **Two discovery prompts.** The application's live prompt is `lib/ai/prompt.ts`; the research specification is `prompts/discovery.json`. Their output shapes differ, so roadmaps produced by the application today carry no `prompt_version`.
-- **`current role` versus `job_title`.** The ERD labels a consultants field "current role", but the column is `job_title`, because `CURRENT_ROLE` is a reserved word in PostgreSQL and fails to parse.
-- **`bridge_recommendations` is not in the ERD.** It was added so bridge conversion is measured per roadmap rather than inferred from bookings.
+- **Two discovery prompts.** The application's live prompt is `lib/ai/prompt.ts` (version `app-discovery-v1`); the research specification is `prompts/discovery.json` (`discovery-v1.1`). Their output shapes differ until the application moves to the specification.
+- **Retry counts.** `DiscoveryResult.retryCount` is recorded as 0 because the AI provider retries internally without reporting it yet.
+- **ERD names.** The ERD's entity names differ from the collection names, for example "consultants" is `MentorProfile` and "roadmaps" is `DiscoveryResult`. The full mapping is in [docs/data-model.md](docs/data-model.md#erd-names-and-collections). `BridgeRecommendation` is not in the ERD; it was added so bridge conversion is measured per result rather than inferred from bookings.
 - **Model identifier.** The specification asked for `claude-opus-4`, which is not a valid model ID. `prompts/discovery.json` uses `claude-opus-4-0`, the exact ID for Claude Opus 4, which is deprecated. Newer models do not accept `temperature`, so changing model means revisiting the determinism approach. See [prompts/README.md](prompts/README.md).
-- **Resource URLs.** Where the exact programme page was not certain, `verified_resources.url` holds the organisation's homepage. Each needs checking before the study starts.
+- **Resource URLs.** Where the exact programme page was not certain, [lib/research/verified-resources.json](lib/research/verified-resources.json) holds the organisation's homepage. Each needs checking before the study starts.
 
 ## Ethics
 
-This repository contains no participant data. The only seeded data is a public catalogue of programmes. Test fixtures use synthetic users on the reserved `.invalid` domain and are removed by each test before it runs.
+This repository contains no participant data. The seeded data is sample mentors, a demo student and a public catalogue of programmes. Test fixtures are synthetic records tagged with a run marker, and `npm run verify:db` deletes them when it finishes.
 
-`analytics_events` carries `participant_code` and not `student_id`, so an export of the research dataset holds no direct identifier by construction: it cannot be joined back to a name or email without the separately protected `students` table. Sessions are not recorded, and the schema has no column that could hold a recording.
+`AnalyticsEvent` carries a `participantCode` and no user or student field, and refuses any extra field, so an export of the research dataset holds no direct identifier by construction: it cannot be joined back to a name or email without the separately protected `StudentProfile` collection. Sessions are not recorded, and the data model has no field that could hold a recording.
 
 Under the data management plan in the ethics application, participant data must never enter version control. `.gitignore` excludes `data/`, `responses/`, `participants/`, `consent/`, and all `.csv` and `.xlsx` files.
 
 ## Running the application
 
-The sections below cover the Next.js application. For the research schema and prompt harness, see [SETUP.md](SETUP.md).
+The sections below cover the Next.js application. For the database checks, research reports and prompt validator, see [SETUP.md](SETUP.md).
 
 ## GitHub repository
 
@@ -104,6 +108,8 @@ https://github.com/kol-apo/Pathora
 | Variable | Needed | Purpose |
 | --- | --- | --- |
 | `MONGODB_URI` | Yes | MongoDB connection string |
+| `AUTH_SECRET` | Yes | Signs the sign-in cookie. Any long random string; see `.env.example` for a command that makes one |
+| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Only for Google sign-in | From Google Cloud Console. Without them the site offers email and password only |
 | `AI_PROVIDER` | No | `mock` (default, offline, no key) or `openai-compatible` |
 | `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Only for a live AI model | Any service that uses the OpenAI chat format, such as Groq, OpenRouter, Gemini or Ollama |
 
@@ -112,8 +118,10 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 ### Checking that it works
 
 ```bash
-npm run verify      # 132 offline checks: slot generation, timezones, AI output validation. No database needed
-npm run verify:db   # 12 live checks against your database, including two simultaneous bookings for one slot
+npm run verify      # 192 offline checks: slots, timezones, matching, model rules, accounts, AI output. No database needed
+npm run verify:db   # 26 live checks: double booking, the bridge, access rules, reports
+npm run report      # research reports: bridge conversion, output validity, session completion
+npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
 ```
 
@@ -171,73 +179,26 @@ The full results page, with the roadmap and the matched consultants, is in [docs
 
 ![Session room](docs/screenshots/12-session-room.png)
 
-### Application database (MongoDB)
+### Database (MongoDB)
 
-The running application stores its data in seven MongoDB collections, defined as Mongoose models in `lib/db/models/`. The research schema for PostgreSQL is [schema.sql](schema.sql), described above.
+Eleven collections, defined as Mongoose models in `lib/db/models/`. Fields, validation rules, indexes and access rules are documented in [docs/data-model.md](docs/data-model.md).
 
 ```mermaid
 erDiagram
-    User ||--o| StudentProfile : "has (role: student)"
-    User ||--o| MentorProfile : "has (role: mentor)"
-    MentorProfile ||--|| Availability : "publishes"
-    MentorProfile ||--o{ Booking : "receives"
-    User ||--o{ Booking : "makes (as student)"
-    User ||--o{ DiscoveryResult : "saves"
-
-    User {
-        string name
-        string email
-        string role
-    }
-    StudentProfile {
-        string university
-        string field
-        number year
-        string careerMatch
-        string matchedSector
-    }
-    MentorProfile {
-        string displayName
-        string role
-        string company
-        string sector
-        number experience
-        string timezone
-        boolean vetted
-        number ratingAvg
-        number sessionCount
-    }
-    Availability {
-        array weekly
-        array exceptions
-        number sessionMinutes
-        number bufferMinutes
-        number leadTimeHours
-        number horizonDays
-    }
-    Booking {
-        string topic
-        date startsAt
-        date endsAt
-        string status
-        boolean active
-    }
-    DiscoveryResult {
-        object answers
-        object primary
-        array secondary
-        string provider
-    }
-    Opportunity {
-        string title
-        string organisation
-        string type
-        string sector
-        date deadline
-    }
+    User ||--o| StudentProfile : "has (student)"
+    User ||--o| MentorProfile : "has (mentor)"
+    User ||--o{ MentorProfile : "approves (admin)"
+    MentorProfile ||--|| Availability : publishes
+    MentorProfile ||--o{ Booking : receives
+    User ||--o{ Booking : "makes (student)"
+    User ||--o{ DiscoveryResult : completes
+    DiscoveryResult ||--|{ BridgeRecommendation : "surfaces 3"
+    MentorProfile ||--o{ BridgeRecommendation : "is surfaced in"
+    DiscoveryResult ||--o{ Booking : "leads to (bridge)"
+    Booking ||--o| VideoSession : "takes place in"
 ```
 
-`Opportunity` stands alone: it lists fellowships, internships and similar openings by sector.
+`Opportunity`, `VerifiedResource` and `AnalyticsEvent` link to nothing. For `AnalyticsEvent` that is deliberate, so research data cannot be joined back to a person.
 
 ### How booking works in the application
 
@@ -264,10 +225,10 @@ Steps:
 1. Create the Atlas cluster and a database user, and allow connections from anywhere (`0.0.0.0/0`), because Vercel's servers do not have fixed IP addresses.
 2. Run `npm run seed` once from a local machine against the Atlas connection string, to load the data and build the indexes.
 3. Import the GitHub repository into Vercel. It detects Next.js and needs no build configuration.
-4. In the Vercel project settings, add the environment variables: `MONGODB_URI`, and the `AI_*` variables if a live AI model is used.
+4. In the Vercel project settings, add the environment variables: `MONGODB_URI`, `AUTH_SECRET`, the Google keys if used, and the `AI_*` variables if a live AI model is used.
 5. Deploy. Every later push to `main` redeploys automatically.
 
-Before the deployed site can take bookings, sign-in has to be built (planned with Auth.js). The demo student used in development is deliberately switched off in production, so a deployed copy will show consultants and open times but answer "Sign in to book a session". Live video is planned with Whereby, with one room per booking.
+Also add `AUTH_SECRET` (and the Google keys, if used) in Vercel. For Google sign-in, add the deployed address's callback, `https://<your-domain>/api/auth/callback/google`, to the Google client's authorised redirect URIs. Live video is planned with Whereby, with one room per booking.
 
 ## Video demo
 
@@ -280,45 +241,58 @@ app/                        Pages and API routes (Next.js App Router)
   page.tsx                  Landing page
   explore/                  Browse consultants
   consultants/[id]/         Consultant profile and booking
-  discover/                 Career discovery questionnaire and results
+  discover/                 Career Discovery: chat with the Pathora Guide, then results
   dashboard/                Student dashboard
   session/[id]/             Session room
+  signin/, signup/          Sign-in and sign-up
+  welcome/                  Research consent, shown once after sign-up
+  become-a-mentor/          Mentor application
+  mentor/                   Mentor console: sessions and weekly hours
+  admin/                    Admin console: overview, research reports, mentor review
   api/
     discovery/              POST   run the discovery agent on a set of answers
     mentors/                GET    list consultants (sector, sort, search)
     mentors/[id]/           GET    one consultant
     mentors/[id]/slots/     GET    a consultant's open slots
-    bookings/               POST   book a slot; GET a student's sessions
+    bookings/               POST   book a slot; GET a student's sessions (signed-in students only)
+    auth/[...nextauth]/     Auth.js sign-in, sign-out and session
+    register/               POST   create a student account
+    consent/                POST   record research consent
+    mentor/                 POST   apply; PUT weekly hours; POST confirm or decline a booking
+    admin/mentors/[id]/     POST   approve, reject, suspend or reinstate a mentor
 components/                 Interface components
+  auth/                     Sign-in, sign-up and consent forms
+  console/                  Mentor and admin console pieces
+  brand/                    The Pathora Guide character
+  landing/                  Landing page hero and sections
   consultant/               Consultant cards, sector filter, booking panel
-  discover/                 Question cards, progress bar, results
+  discover/                 Discovery chat, progress bar, results
   dashboard/, layout/, opportunities/, ui/
 lib/
   ai/                       Discovery agent: prompt, AI provider, output validation, offline fallback
   booking/                  Slot generation and timezone handling
+  matching/                 Interest vectors, cosine similarity, bridge ranking
+  research/                 The verified resource catalogue (allow-list)
   db/
-    models/                 The seven Mongoose models and their indexes
-    queries/                Database queries for consultants, slots and bookings
+    models/                 The eleven Mongoose models and their indexes
+    queries/                Mentors, slots, bookings, the bridge, access rules, research reports
     connect.ts              Database connection
-  discovery/                The questionnaire's questions and answer validation
+  discovery/                The six questions and answer validation
   data.ts                   Sample data, used for seeding and for pages not yet on the database
 scripts/
   seed.ts                   Loads the database and builds the indexes
   verify.ts                 Offline test suite
   verify-db.ts              Live database test suite
-docs/screenshots/           Screenshots used in this README
-
-schema.sql                  Research schema for PostgreSQL / Supabase: tables, indexes, functions, RLS, views, seeds
-demo.sh                     Builds schema.sql in a fresh database and runs the three database test suites
-tests/db/
-  test_concurrency.sh       Two students race for one slot; each double-booking layer tested alone
-  test_bridge.sh            Roadmap-to-consultant matching and the conversion funnel
-  test_rls.sh               Row-level security: what each participant can and cannot see
+  report.ts                 Research reports
+  make-admin.ts             Promotes an existing account to admin
 prompts/
   discovery.json            The versioned prompt specification: prompt, output contract, validators
   validate_prompt.py        Offline validator for the specification (no API key needed)
   fixtures/                 A known-good roadmap and a known-good refusal
-SETUP.md                    How to run demo.sh and the prompt validator
+docs/
+  data-model.md             The MongoDB schema: collections, rules, indexes, access
+  screenshots/              Screenshots used in this README
+SETUP.md                    Database setup, checks, reports and the prompt validator
 ```
 
 Main files to read first:
@@ -328,5 +302,8 @@ Main files to read first:
 | `lib/booking/slots.ts` | How open slots are generated from availability rules |
 | `lib/db/queries/bookings.ts` | How a booking is created and how double-booking is handled |
 | `lib/db/models/Booking.ts` | The booking schema and the unique index |
+| `lib/db/queries/bridge.ts` | How a discovery result is matched to three mentors |
+| `lib/matching/similarity.ts` | Cosine similarity and the bridge ranking, with the reasoning for the metric |
+| `docs/data-model.md` | The whole schema, with the rules each check proves |
 | `lib/ai/discovery.ts` | How the discovery agent runs and falls back to offline scoring |
 | `components/consultant/BookingPanel.tsx` | The booking interface |

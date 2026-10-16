@@ -7,7 +7,24 @@
  * (especially the double-booking index) and slot generation across timezones.
  */
 import mongoose from 'mongoose';
-import { Availability, Booking, MentorProfile, User } from '../lib/db/models';
+import {
+  AnalyticsEvent,
+  Availability,
+  Booking,
+  BridgeRecommendation,
+  DiscoveryResult,
+  MentorProfile,
+  User,
+  VideoSession,
+} from '../lib/db/models';
+import { cosineSimilarity, isValidVector, rankCandidates, VECTOR_AXES } from '../lib/matching/similarity';
+import { safeReturnPath } from '../components/auth/messages';
+import { generateParticipantCode, PARTICIPANT_CODE_PATTERN } from '../lib/research/participant';
+import { initialsFor } from '../lib/db/queries/accounts';
+import { homeFor } from '../lib/auth/guard';
+import { cleanProfileLinks, MAX_LINKS, normaliseLinkedIn, normaliseUrl, normaliseX } from '../lib/profileLinks';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   addDays,
   formatZonedDate,
@@ -737,6 +754,281 @@ async function dataLayerTests() {
   ok('a rolling deadline serialises as null', opp.deadline === null);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Research data layer: matching maths and the rules the models enforce
+// ═══════════════════════════════════════════════════════════════════════════
+async function researchTests() {
+  section('Cosine similarity');
+
+  const a = [0.9, 0.6, 0.2, 0.1, 0.3];
+  eq('identical vectors score 1', cosineSimilarity(a, a), 1);
+  eq('orthogonal vectors score 0', cosineSimilarity([1, 0, 0, 0, 0], [0, 1, 0, 0, 0]), 0);
+  eq(
+    'magnitude-invariant: a verbose student scores the same as a terse one',
+    cosineSimilarity([0.2, 0.4, 0.1, 0.1, 0.2], a),
+    cosineSimilarity([0.4, 0.8, 0.2, 0.2, 0.4], a),
+  );
+  eq('a zero vector gives null, not a division by zero', cosineSimilarity([0, 0, 0, 0, 0], a), null);
+  eq('mismatched lengths give null', cosineSimilarity([0.1, 0.2], a), null);
+  eq('a missing vector gives null', cosineSimilarity(null, a), null);
+  ok(
+    'rounded to 5 decimal places',
+    /^0\.\d{1,5}$/.test(String(cosineSimilarity([0.3, 0.2, 0.8, 0.4, 0.6], a))),
+  );
+
+  section('Bridge ranking');
+
+  const candidates = [
+    { id: 'c', vector: [0.2, 0.1, 0.3, 0.9, 0.5] },
+    { id: 'a', vector: [0.9, 0.6, 0.2, 0.1, 0.3] },
+    { id: 'b', vector: [0.85, 0.7, 0.15, 0.1, 0.25] },
+    { id: 'd', vector: [0.3, 0.2, 0.8, 0.4, 0.6] },
+    { id: 'novec', vector: undefined },
+  ];
+  const ranked = rankCandidates([0.88, 0.65, 0.2, 0.1, 0.3], candidates);
+  eq('returns the top three, nearest first', ranked.map((r) => r.id), ['a', 'b', 'd']);
+  eq('ranks are 1, 2, 3', ranked.map((r) => r.rank), [1, 2, 3]);
+  ok(
+    'similarities are in descending order',
+    ranked.every((r, i) => i === 0 || ranked[i - 1].similarity >= r.similarity),
+  );
+  eq(
+    'ties are broken by id, so the ranking is reproducible',
+    rankCandidates([1, 0, 0, 0, 0], [
+      { id: 'z', vector: [1, 0, 0, 0, 0] },
+      { id: 'm', vector: [1, 0, 0, 0, 0] },
+    ]).map((r) => r.id),
+    ['m', 'z'],
+  );
+  ok(
+    'candidates without a vector are left out',
+    !rankCandidates([1, 0, 0, 0, 0], candidates, 10).some((r) => r.id === 'novec'),
+  );
+  eq(
+    'too few candidates gives a short list (the caller then refuses)',
+    rankCandidates(a, candidates.slice(0, 2)).length,
+    2,
+  );
+
+  section('Interest vectors');
+  ok('a 5-number vector in [0,1] is valid', isValidVector([0, 0.5, 1, 0.2, 0.3]));
+  ok('4 numbers is rejected', !isValidVector([0.1, 0.2, 0.3, 0.4]));
+  ok('a value above 1 is rejected', !isValidVector([0.1, 0.2, 0.3, 0.4, 1.2]));
+  ok('NaN is rejected', !isValidVector([0.1, 0.2, 0.3, 0.4, Number.NaN]));
+
+  section('Mentor approval');
+
+  const admin = new mongoose.Types.ObjectId();
+  const mentorBase = {
+    user: new mongoose.Types.ObjectId(),
+    displayName: 'Approval Test',
+    initials: 'AT',
+    role: 'Engineer',
+    company: 'Test',
+    sector: 'Technology',
+    experience: 5,
+    bio: 'b',
+    timezone: 'Africa/Lagos',
+  };
+  await rejects('an approval without approvedBy is rejected', () =>
+    new MentorProfile({ ...mentorBase, status: 'approved' }).validate(),
+  );
+  const approved = new MentorProfile({
+    ...mentorBase,
+    status: 'approved',
+    approvedBy: admin,
+    approvedAt: new Date(),
+  });
+  await approved.validate();
+  ok('an attributed approval is accepted and marks the mentor vetted', approved.vetted === true);
+  const pending = new MentorProfile({ ...mentorBase, vetted: true });
+  await pending.validate();
+  ok('vetted cannot be set by hand: a pending mentor stays unvetted', pending.vetted === false);
+  await rejects('a 4-number profile vector is rejected', () =>
+    new MentorProfile({ ...mentorBase, profileVector: [0.1, 0.2, 0.3, 0.4] }).validate(),
+  );
+
+  section('Discovery result provenance');
+
+  const resultBase = {
+    answers: { status: 0, interests: [0], environment: 0, strength: 0, vision: 0 },
+    primary: { title: 't', sector: 'Technology', description: 'd', why: 'w', africanMarket: 'a' },
+    provider: 'mock',
+    model: 'offline',
+  };
+  await rejects('a result without promptVersion is rejected', () =>
+    new DiscoveryResult(resultBase).validate(),
+  );
+  await rejects('an invalid student vector is rejected', () =>
+    new DiscoveryResult({ ...resultBase, promptVersion: 'v1', studentVector: [2, 0, 0, 0, 0] }).validate(),
+  );
+  const result = new DiscoveryResult({ ...resultBase, promptVersion: 'v1' });
+  await result.validate();
+  ok(
+    'a result defaults to schemaValid and zero retries',
+    result.schemaValid === true && result.retryCount === 0,
+  );
+
+  section('Bridge records');
+
+  const bookingBase = {
+    student: new mongoose.Types.ObjectId(),
+    mentor: new mongoose.Types.ObjectId(),
+    topic: 't',
+    startsAt: new Date('2026-12-01T09:00:00Z'),
+    endsAt: new Date('2026-12-01T09:45:00Z'),
+  };
+  await rejects('a bridge booking without a discovery result is rejected', () =>
+    new Booking({ ...bookingBase, viaBridge: true }).validate(),
+  );
+  const cancelled = new Booking({ ...bookingBase, status: 'cancelled' });
+  await cancelled.validate();
+  ok('cancelling stamps cancelledAt', cancelled.cancelledAt instanceof Date);
+
+  const recBase = {
+    discoveryResult: new mongoose.Types.ObjectId(),
+    mentor: new mongoose.Types.ObjectId(),
+    similarity: 0.9,
+  };
+  await rejects('rank 4 is rejected (the bridge is exactly three)', () =>
+    new BridgeRecommendation({ ...recBase, rank: 4 }).validate(),
+  );
+  await rejects('a booking before the view is rejected (funnel order)', () =>
+    new BridgeRecommendation({
+      ...recBase,
+      rank: 1,
+      viewedAt: new Date('2026-12-02'),
+      bookedAt: new Date('2026-12-01'),
+    }).validate(),
+  );
+  const recIndexes = BridgeRecommendation.schema.indexes().map(([, o]) => o?.name);
+  ok(
+    'one mentor per result and one mentor per rank are unique indexes',
+    recIndexes.includes('one_mentor_per_result') && recIndexes.includes('one_mentor_per_rank'),
+  );
+
+  section('Research privacy');
+
+  const analyticsPaths = Object.keys(AnalyticsEvent.schema.paths);
+  ok(
+    'analytics events carry no user or student field',
+    !analyticsPaths.some((path) => /user|student|email|name/i.test(path)),
+    analyticsPaths.join(', '),
+  );
+  let strictThrown = false;
+  try {
+    new AnalyticsEvent({ participantCode: 'P-1', eventType: 'x', studentId: 'abc' });
+  } catch {
+    strictThrown = true;
+  }
+  ok('an analytics event with an identifier field is refused outright', strictThrown);
+  ok(
+    'no recording field exists on video sessions (consent: sessions are not recorded)',
+    !Object.keys(VideoSession.schema.paths).some((path) => /record/i.test(path)),
+  );
+  const session = new VideoSession({
+    booking: new mongoose.Types.ObjectId(),
+    roomUrl: 'https://example.invalid/room',
+    roomExpiresAt: new Date('2026-12-01T10:00:00Z'),
+    startedAt: new Date('2026-12-01T09:00:00Z'),
+    endedAt: new Date('2026-12-01T09:42:30Z'),
+  });
+  await session.validate();
+  eq('session duration is derived from start and end', session.durationSeconds, 2550);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Accounts and consoles: rules that need no database
+// ═══════════════════════════════════════════════════════════════════════════
+async function accountTests() {
+  section('Sign-in return address');
+  eq('a same-site path is kept', safeReturnPath('/consultants/abc', '/dashboard'), '/consultants/abc');
+  eq('another website (//) is refused', safeReturnPath('//evil.example', '/dashboard'), '/dashboard');
+  eq('another website (/\\) is refused', safeReturnPath('/\\evil.example', '/dashboard'), '/dashboard');
+  eq('a full URL is refused', safeReturnPath('https://evil.example', '/dashboard'), '/dashboard');
+  eq('nothing given falls back', safeReturnPath(undefined, '/welcome'), '/welcome');
+
+  section('Participant codes');
+  const codes = Array.from({ length: 500 }, () => generateParticipantCode());
+  ok('every code looks like P-XXXXXX', codes.every((c) => PARTICIPANT_CODE_PATTERN.test(c)), codes.find((c) => !PARTICIPANT_CODE_PATTERN.test(c)));
+  ok('codes avoid look-alike characters (0, O, 1, I, L)', codes.every((c) => !/[01OIL]/.test(c.slice(2))));
+  ok('codes are random, not sequential (500 drawn, all distinct)', new Set(codes).size === codes.length);
+
+  section('Names and roles');
+  eq('initials from first and last name', initialsFor('Amara Grace Okafor'), 'AO');
+  eq('initials from a single name', initialsFor('Zainab'), 'ZA');
+  eq('home for each role', [homeFor('student'), homeFor('mentor'), homeFor('admin')], ['/dashboard', '/mentor', '/admin']);
+
+  section('Interest axes');
+  const spec = JSON.parse(readFileSync(join(process.cwd(), 'prompts', 'discovery.json'), 'utf8'));
+  eq(
+    'the admin sliders use exactly the axes in prompts/discovery.json, in order',
+    VECTOR_AXES.map((a) => a.name),
+    spec.vector_space.axes.map((a: { name: string }) => a.name),
+  );
+  eq('and the same dimension', spec.vector_space.dimension, VECTOR_AXES.length);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mentor links: LinkedIn, X and other links
+// ═══════════════════════════════════════════════════════════════════════════
+async function linkTests() {
+  section('Mentor links');
+  eq('"https://" is added when left off', normaliseUrl('janedoe.dev/work'), 'https://janedoe.dev/work');
+  eq('a javascript: link is refused', normaliseUrl('javascript:alert(1)'), null);
+  eq('a data: link is refused', normaliseUrl('data:text/html,hi'), null);
+  eq('a word with no domain is refused', normaliseUrl('portfolio'), null);
+
+  const li = normaliseLinkedIn('linkedin.com/in/jane-doe');
+  ok('a LinkedIn address is accepted and completed', li.ok && li.value === 'https://linkedin.com/in/jane-doe');
+  ok('a non-LinkedIn address is refused for LinkedIn', !normaliseLinkedIn('https://evil.example/in/jane').ok);
+  ok('a look-alike domain is refused for LinkedIn', !normaliseLinkedIn('https://linkedin.com.evil.example/in/x').ok);
+
+  const handle = normaliseX('@jane_doe');
+  ok('an X handle becomes an x.com link', handle.ok && handle.value === 'https://x.com/jane_doe');
+  const tw = normaliseX('https://twitter.com/jane_doe');
+  ok('an old twitter.com link is accepted', tw.ok);
+  ok('a non-X address is refused for X', !normaliseX('https://example.com/jane').ok);
+
+  const cleaned = cleanProfileLinks({
+    socials: { linkedin: '', x: '' },
+    links: [
+      { kind: 'video', url: 'youtube.com/watch?v=abc', title: '  My talk  ' },
+      { kind: 'portfolio', url: '   ' },
+    ],
+  });
+  ok(
+    'blank rows are dropped, addresses completed, titles trimmed',
+    cleaned.ok &&
+      cleaned.value.links.length === 1 &&
+      cleaned.value.links[0].url === 'https://youtube.com/watch?v=abc' &&
+      cleaned.value.links[0].title === 'My talk',
+  );
+  ok(
+    `more than ${MAX_LINKS} links are refused`,
+    !cleanProfileLinks({ links: Array.from({ length: 6 }, (_, i) => ({ kind: 'website', url: `site${i}.example` })) }).ok,
+  );
+  ok('an unknown link type is refused', !cleanProfileLinks({ links: [{ kind: 'podcast', url: 'pod.example' }] }).ok);
+
+  await rejects('the database refuses a javascript: link even if the checks were skipped', () =>
+    new MentorProfile({
+      user: new mongoose.Types.ObjectId(),
+      displayName: 'Link Test',
+      initials: 'LT',
+      role: 'r',
+      company: 'c',
+      sector: 'Creative',
+      experience: 3,
+      bio: 'b',
+      timezone: 'Africa/Lagos',
+      links: [{ kind: 'website', url: 'javascript:alert(1)' }],
+    }).validate(),
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   await timezoneTests();
@@ -744,6 +1036,9 @@ async function main() {
   await schemaTests();
   await discoveryTests();
   await dataLayerTests();
+  await researchTests();
+  await accountTests();
+  await linkTests();
 
   console.log(`\n${'═'.repeat(62)}`);
   console.log(failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${passed} passed, ${failed} FAILED`);

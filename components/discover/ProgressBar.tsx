@@ -19,7 +19,7 @@ export default function ProgressBar({
         <span
           key={i}
           className={`h-[3px] flex-1 transition-colors duration-300 ${
-            i < currentStep ? 'bg-ink' : 'bg-line'
+            i < currentStep ? 'bg-navy' : 'bg-sky-muted'
           }`}
         />
       ))}

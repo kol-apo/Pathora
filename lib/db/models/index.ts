@@ -14,10 +14,15 @@ export { default as Availability } from './Availability';
 export { default as Booking, ACTIVE_BOOKING_STATUSES } from './Booking';
 export { default as DiscoveryResult } from './DiscoveryResult';
 export { default as Opportunity, OPPORTUNITY_TYPES } from './Opportunity';
+export { default as BridgeRecommendation } from './BridgeRecommendation';
+export { default as VerifiedResource, RESOURCE_TYPES } from './VerifiedResource';
+export { default as AnalyticsEvent } from './AnalyticsEvent';
+export { default as VideoSession } from './VideoSession';
 
 export type { IUser, UserRole } from './User';
 export type { IStudentProfile } from './StudentProfile';
-export type { IMentorProfile } from './MentorProfile';
+export type { IMentorProfile, MentorStatus } from './MentorProfile';
+export { MENTOR_STATUSES } from './MentorProfile';
 export type { IAvailability, IWeeklyRule, IException, IWindow } from './Availability';
 export type { IBooking, IBookingNote, IBookingRating, BookingStatus } from './Booking';
 export type {
@@ -27,3 +32,7 @@ export type {
   ISecondaryMatch,
 } from './DiscoveryResult';
 export type { IOpportunity, OpportunityType } from './Opportunity';
+export type { IBridgeRecommendation } from './BridgeRecommendation';
+export type { IVerifiedResource, ResourceType } from './VerifiedResource';
+export type { IAnalyticsEvent } from './AnalyticsEvent';
+export type { IVideoSession, SessionStatus } from './VideoSession';

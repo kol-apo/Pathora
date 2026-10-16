@@ -1,4 +1,8 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
+import { homeFor } from '@/lib/auth/guard';
+import { getStudentStatus } from '@/lib/db/queries/accounts';
 import Sidebar from '@/components/layout/Sidebar';
 import StatCard from '@/components/dashboard/StatCard';
 import UpcomingSession from '@/components/dashboard/UpcomingSession';
@@ -29,7 +33,19 @@ function Panel({
   );
 }
 
-export default function DashboardPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function DashboardPage() {
+  // Middleware already guarantees a signed-in user; students must also have
+  // given research consent before using Pathora.
+  const session = await auth();
+  if (!session?.user?.id) redirect('/signin?callbackUrl=/dashboard');
+  if (session.user.role !== 'student') redirect(homeFor(session.user.role));
+  if (session.user.role === 'student' && !(await getStudentStatus(session.user.id)).consented) {
+    redirect('/welcome');
+  }
+  const firstName = (session.user.name ?? '').split(' ')[0];
+
   const student = currentStudent;
   const recommended = featuredForSector(student.matchedSector, 3);
   const latestOpportunities = opportunities.slice(0, 3);
@@ -42,10 +58,10 @@ export default function DashboardPage() {
         <div className="mx-auto flex max-w-[1100px] flex-col gap-7">
           <header>
             <h1 className="text-[26px] font-bold tracking-[-0.03em] text-ink md:text-[28px]">
-              Welcome back, {student.name.split(' ')[0]}
+              Welcome back{firstName ? `, ${firstName}` : ''}
             </h1>
-            <p className="mt-1.5 text-[15px] text-muted">
-              {student.field}, Year {student.year} · Career match: {student.careerMatch}
+            <p className="mt-2 inline-block rounded-md bg-sky-soft px-3 py-1.5 text-[13px] text-navy">
+              Sample data: your sessions, matches and opportunities will appear here as you use Pathora.
             </p>
           </header>
 
@@ -75,7 +91,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Career path progress */}
-          <section className="flex flex-col gap-6 rounded-lg border border-line bg-surface p-6 md:flex-row md:items-center md:justify-between">
+          <section className="flex flex-col gap-6 rounded-lg border border-sky-muted bg-sky-soft p-6 md:flex-row md:items-center md:justify-between">
             <div className="flex min-w-0 flex-col gap-3.5 md:pr-8">
               <div className="flex flex-col gap-1">
                 <h2 className="text-[15px] font-semibold text-ink">
@@ -98,7 +114,7 @@ export default function DashboardPage() {
                   <span
                     key={i}
                     className={`h-1 flex-1 rounded-full ${
-                      i < student.milestonesDone ? 'bg-ink' : 'bg-line'
+                      i < student.milestonesDone ? 'bg-navy' : 'bg-sky-muted'
                     }`}
                   />
                 ))}
