@@ -1,4 +1,4 @@
-import type { DiscoveryAnswers } from '@/lib/discovery/questions';
+import { studentVectorFor, type DiscoveryAnswers } from '@/lib/discovery/questions';
 import { generateMockMatch } from './providers/mock';
 import { PROMPT_VERSION } from './prompt';
 import { resolveProvider, type DiscoveryProvider, type ProviderEnv } from './provider';
@@ -116,5 +116,8 @@ export function toDiscoveryResultDoc(
     // Not yet reported by the provider, which retries internally (see
     // providers/llm.ts). Recorded as 0 until the provider exposes its count.
     retryCount: 0,
+    // Calculated from the answers, not by the model, so the bridge ranking can
+    // be reproduced from the stored answers without calling a model again.
+    studentVector: studentVectorFor(answers),
   };
 }

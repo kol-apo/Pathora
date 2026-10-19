@@ -1,11 +1,41 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { ArrowRight } from 'lucide-react';
+import { auth } from '@/auth';
+import { homeFor } from '@/lib/auth/guard';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import HeroJourney from '@/components/landing/HeroJourney';
-import { ClosingCta, HowItWorks, Sectors, Testimonials } from '@/components/landing/LandingSections';
-import { consultants } from '@/lib/data';
+import { About, ClosingCta, ForMentors, HowItWorks, Sectors } from '@/components/landing/LandingSections';
+import { listMentors } from '@/lib/db/queries/mentors';
+import { partnersFirst, toConsultant } from '@/lib/mentors';
+import { consultants as sampleConsultants } from '@/lib/data';
+import type { Consultant } from '@/lib/types';
 
-export default function LandingPage() {
+export const dynamic = 'force-dynamic';
+
+/** Approved mentors for the sector cards and the hero count. Empty if the database is unreachable. */
+async function approvedMentors(): Promise<Consultant[]> {
+  try {
+    const { mentors } = await listMentors({ limit: 100 });
+    return partnersFirst(mentors.map(toConsultant));
+  } catch (err) {
+    console.error('[landing] could not load mentors:', err);
+    return [];
+  }
+}
+
+/**
+ * The public front door: what Pathora is, how it works, and the way in for
+ * students and for mentors. Signed-in users never see it; they go straight
+ * to their own home.
+ */
+export default async function LandingPage() {
+  const session = await auth();
+  if (session?.user) redirect(homeFor(session.user.role));
+
+  const mentors = await approvedMentors();
+
   return (
     <>
       <Navbar />
@@ -39,28 +69,29 @@ export default function LandingPage() {
               starts here, not after.
             </h1>
             <p className="mt-5 max-w-md text-base leading-relaxed text-muted">
-              Vetted professionals across Africa, giving free sessions to students. Find your
-              direction, then talk to someone already working in it.
+              Speak with Pathy to find your direction, then book a free session with a vetted professional
+              already working in it.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/explore"
-                className="rounded bg-navy px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
+                href="/signup"
+                className="group flex items-center gap-2 rounded bg-navy px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
               >
-                Find a consultant
+                Get started, it&apos;s free
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
-                href="/discover"
+                href="/become-a-mentor"
                 className="rounded border border-line px-6 py-3.5 text-sm font-medium text-ink transition-colors hover:bg-surface"
               >
-                Discover your path
+                Become a mentor
               </Link>
             </div>
             <dl className="mt-10 flex flex-wrap gap-x-8 gap-y-4 border-t border-line pt-6">
               {[
-                ['120+', 'Vetted consultants'],
+                ...(mentors.length > 0 ? [[String(mentors.length), 'Vetted mentors']] : []),
                 ['4', 'Sectors'],
-                ['Free', 'To start'],
+                ['Free', 'Always, for students'],
               ].map(([value, label]) => (
                 <div key={label} className="flex flex-col-reverse">
                   <dt className="mt-0.5 text-[12.5px] text-muted">{label}</dt>
@@ -68,17 +99,16 @@ export default function LandingPage() {
                 </div>
               ))}
             </dl>
-            <p className="mt-5 text-[13px] leading-relaxed text-faint">
-              500+ students already building their careers across Nigeria, Rwanda &amp; beyond.
-            </p>
           </div>
 
-          <HeroJourney consultant={consultants[0]} />
+          {/* An illustration of the journey, drawn with sample people. */}
+          <HeroJourney consultant={sampleConsultants[0]} />
         </section>
 
-        <HowItWorks consultant={consultants[1]} />
-        <Sectors consultants={consultants} />
-        <Testimonials />
+        <HowItWorks consultant={sampleConsultants[1]} />
+        <Sectors consultants={mentors} />
+        <ForMentors />
+        <About />
         <ClosingCta />
       </main>
       <Footer />

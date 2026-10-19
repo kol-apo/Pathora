@@ -1,20 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { AlertCircle, ArrowRight, Check, Loader2 } from 'lucide-react';
-import Guide from '@/components/brand/Guide';
+import { useRouter } from 'next/navigation';
+import { AlertCircle, Check, Loader2 } from 'lucide-react';
 
-/** Research consent: read, tick, agree. Then straight into the Guide chat. */
+/** Research consent: read, tick, agree. Then straight to the dashboard. */
 export default function ConsentForm({
-  firstName,
   title,
   points,
   agreement,
   version,
   isDraft,
 }: {
-  firstName: string;
   title: string;
   points: string[];
   agreement: string;
@@ -24,7 +21,7 @@ export default function ConsentForm({
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  const router = useRouter();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,31 +38,10 @@ export default function ConsentForm({
       setBusy(false);
       return;
     }
-    setDone(true);
+    // Straight into the app: the dashboard points them to Pathy from there.
+    router.push('/dashboard');
+    router.refresh();
   };
-
-  if (done) {
-    return (
-      <div className="flex flex-col items-center text-center">
-        <Guide size={88} mood="happy" />
-        <h2 className="mt-6 text-[24px] font-bold tracking-[-0.02em] text-ink">You&apos;re in, {firstName}.</h2>
-        <p className="mt-2 max-w-sm text-[15px] leading-relaxed text-muted">
-          Let&apos;s find your direction. Six quick questions with the Pathora Guide, then the people already
-          working in it.
-        </p>
-        <Link
-          href="/discover"
-          className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded bg-navy text-[15px] font-medium text-white transition-colors hover:bg-navy-deep"
-        >
-          Chat with the Guide
-          <ArrowRight size={17} />
-        </Link>
-        <Link href="/dashboard" className="mt-4 text-sm font-medium text-muted hover:text-navy">
-          Skip for now, go to my dashboard
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={submit}>

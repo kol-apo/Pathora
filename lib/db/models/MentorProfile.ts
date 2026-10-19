@@ -2,6 +2,7 @@ import mongoose, { Schema, type Model, type Types } from 'mongoose';
 import { SECTORS, type Sector } from '@/lib/types';
 import { VECTOR_DIMENSION, isValidVector } from '@/lib/matching/similarity';
 import { LINK_KINDS, MAX_LINKS, type LinkKind } from '@/lib/profileLinks';
+import { MENTOR_SOURCES, type MentorSource } from '@/lib/partners';
 
 export type MentorStatus = 'pending_review' | 'approved' | 'rejected' | 'suspended';
 export const MENTOR_STATUSES: MentorStatus[] = ['pending_review', 'approved', 'rejected', 'suspended'];
@@ -15,9 +16,11 @@ export interface IMentorProfile {
   initials: string;
 
   role: string;
+  /** Empty when not known, e.g. for partner mentors listed from their directory. */
   company: string;
   sector: Sector;
-  experience: number;
+  /** Years of experience. Absent when not known, rather than a made-up number. */
+  experience?: number;
   /** The two short pills on the consultant card. */
   focus: string[];
   /** Longer expertise list shown on the profile page. */
@@ -29,6 +32,11 @@ export interface IMentorProfile {
   socials?: { linkedin?: string; x?: string };
   /** Up to five other links: portfolio, publications, videos, a website. */
   links: { kind: LinkKind; url: string; title?: string }[];
+
+  /** Headshot: a file under /public/mentors, or an https address. */
+  photo?: string;
+  /** Where this mentor came from: 'pathora' (applied here) or a partner organisation. */
+  source: MentorSource;
 
   /** IANA zone, e.g. "Africa/Lagos". Every availability rule is read in this zone. */
   timezone: string;
@@ -75,9 +83,9 @@ const MentorProfileSchema = new Schema<IMentorProfile>(
     initials: { type: String, required: true, uppercase: true, maxlength: 3 },
 
     role: { type: String, required: true, trim: true },
-    company: { type: String, required: true, trim: true },
+    company: { type: String, default: '', trim: true },
     sector: { type: String, enum: SECTORS, required: true, index: true },
-    experience: { type: Number, required: true, min: 0, max: 60 },
+    experience: { type: Number, min: 0, max: 60 },
     focus: {
       type: [String],
       default: [],
@@ -112,6 +120,14 @@ const MentorProfileSchema = new Schema<IMentorProfile>(
         message: `At most ${MAX_LINKS} links.`,
       },
     },
+
+    photo: {
+      type: String,
+      trim: true,
+      // A file this site serves, or a secure web address. Nothing else reaches an <img>.
+      match: /^(\/mentors\/[a-z0-9-]+\.(webp|png|jpe?g)|https:\/\/\S+)$/,
+    },
+    source: { type: String, enum: MENTOR_SOURCES, default: 'pathora', index: true },
 
     timezone: { type: String, required: true, default: 'Africa/Lagos' },
 

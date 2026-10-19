@@ -1,3 +1,5 @@
+import type { MentorSource } from './partners';
+
 export type Sector = 'Entrepreneurship' | 'Technology' | 'Finance' | 'Creative';
 
 export const SECTORS: Sector[] = ['Entrepreneurship', 'Technology', 'Finance', 'Creative'];
@@ -7,9 +9,18 @@ export interface Consultant {
   name: string;
   initials: string;
   role: string;
+  /** Empty when not known; cards then show the country instead. */
   company: string;
   sector: Sector;
-  experience: number;
+  /** Null when not known. */
+  experience: number | null;
+  country?: string | null;
+  /** Headshot URL, if the mentor has one. */
+  photo?: string | null;
+  /** 'pathora', or the partner organisation that listed them. */
+  source?: MentorSource;
+  /** False when the mentor is not taking bookings on Pathora yet. */
+  bookable?: boolean;
   /** Two short phrases shown as outlined pills on the card. */
   focus: string[];
   /** Longer expertise list shown on the profile page. */

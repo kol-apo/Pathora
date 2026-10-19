@@ -1,4 +1,5 @@
 import { isValidObjectId } from 'mongoose';
+import type { MentorSource } from '@/lib/partners';
 import dbConnect from '../connect';
 import { Booking, DiscoveryResult, MentorProfile, User } from '../models';
 import type { MentorStatus } from '../models/MentorProfile';
@@ -22,7 +23,10 @@ export interface MentorReviewDTO {
   company: string;
   sector: Sector;
   country?: string;
-  experience: number;
+  /** Null when not known. */
+  experience: number | null;
+  photo: string | null;
+  source: MentorSource;
   bio: string;
   focus: string[];
   tags: string[];
@@ -48,7 +52,9 @@ function toReviewDTO(doc: any): MentorReviewDTO {
     company: doc.company,
     sector: doc.sector,
     country: doc.country,
-    experience: doc.experience,
+    experience: typeof doc.experience === 'number' ? doc.experience : null,
+    photo: doc.photo || null,
+    source: doc.source ?? 'pathora',
     bio: doc.bio,
     focus: doc.focus ?? [],
     tags: doc.tags ?? [],

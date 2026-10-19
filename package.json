@@ -11,7 +11,9 @@
     "verify": "tsx scripts/verify.ts",
     "verify:db": "tsx scripts/verify-db.ts",
     "report": "tsx scripts/report.ts",
-    "make-admin": "tsx scripts/make-admin.ts"
+    "make-admin": "tsx scripts/make-admin.ts",
+    "import-jointhub": "tsx scripts/import-jointhub.ts",
+    "fetch-opportunities": "tsx scripts/fetch-opportunities.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

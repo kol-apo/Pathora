@@ -88,3 +88,38 @@ function hostLabel(baseUrl: string): string {
     return 'openai-compatible';
   }
 }
+
+/** A plain-text chat model: who it is, and the call that returns its reply. */
+export interface ChatModel {
+  name: string;
+  model: string;
+  complete: import('./providers/llm').CompleteFn;
+}
+
+/**
+ * The configured model for free-text chat (Pathy), or null when none is
+ * configured: the offline matcher cannot hold a conversation.
+ */
+export function resolveChatModel(env: ProviderEnv = process.env): ChatModel | null {
+  if ((env.AI_PROVIDER ?? 'mock').trim().toLowerCase() !== 'openai-compatible') return null;
+  if (!env.AI_BASE_URL?.trim() || !env.AI_MODEL?.trim() || !env.AI_API_KEY?.trim()) return null;
+
+  const timeout = Number(env.AI_TIMEOUT_MS);
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { createOpenAICompatibleComplete } =
+    require('./providers/openaiCompatible') as typeof import('./providers/openaiCompatible');
+  return {
+    name: hostLabel(env.AI_BASE_URL),
+    model: env.AI_MODEL.trim(),
+    complete: createOpenAICompatibleComplete({
+      baseUrl: env.AI_BASE_URL.trim(),
+      apiKey: env.AI_API_KEY.trim(),
+      model: env.AI_MODEL.trim(),
+      name: hostLabel(env.AI_BASE_URL),
+      timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : undefined,
+      temperature: 0.5,
+      // A conversation, not a JSON object.
+      jsonMode: false,
+    }),
+  };
+}

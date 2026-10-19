@@ -1,5 +1,5 @@
 import dbConnect from '../connect';
-import { AnalyticsEvent, BridgeRecommendation, DiscoveryResult, VideoSession } from '../models';
+import { AnalyticsEvent, BridgeRecommendation, DiscoveryResult, StudentProfile, VideoSession } from '../models';
 import type { Sector } from '@/lib/types';
 
 /**
@@ -159,4 +159,54 @@ export async function logEvent(
 ): Promise<void> {
   await dbConnect();
   await AnalyticsEvent.create({ participantCode, eventType, payload });
+}
+
+/**
+ * The events the app records. Payloads hold no ids at all, not even record
+ * ids: a discovery result or booking id leads back to a user, which would undo
+ * the pseudonymisation.
+ */
+export type StudyEvent =
+  | { type: 'discovery_completed'; payload: { sector: Sector; promptVersion: string; model: string; usedFallback: boolean } }
+  | { type: 'bridge_surfaced'; payload: { sector: Sector } }
+  | { type: 'bridge_profile_viewed'; payload: { sector: Sector; rank: number } }
+  | { type: 'booking_requested'; payload: { sector: Sector; viaBridge: boolean; rank: number | null } }
+  | { type: 'booking_cancelled'; payload: { sector: Sector; viaBridge: boolean; hoursBeforeStart: number } }
+  // Never the message text: only that a message was sent, and how it was answered.
+  | { type: 'pathy_message'; payload: { sector: Sector; promptVersion: string; model: string; usedFallback: boolean } };
+
+/**
+ * Record an event for a signed-in student. The participant code is looked up
+ * on the server from their profile, never taken from a request, so nobody can
+ * write events under another participant's code. Students who have not
+ * consented have no code and are not recorded.
+ *
+ * Never throws: a research log failing must not fail the student's action.
+ */
+export async function logStudentEvent(userId: string, event: StudyEvent): Promise<void> {
+  try {
+    await dbConnect();
+    const profile = await StudentProfile.findOne({ user: userId, consentedAt: { $exists: true } })
+      .select('participantCode')
+      .lean();
+    if (!profile?.participantCode) return;
+    await logEvent(profile.participantCode, event.type, event.payload);
+  } catch (err) {
+    console.error(`[research] could not record ${event.type}:`, err);
+  }
+}
+
+/**
+ * How many events of a type a student has recorded since a time. Used for
+ * Pathy's daily message allowance. Zero for a student with no participant code.
+ */
+export async function countStudentEvents(userId: string, eventType: StudyEvent['type'], since: Date): Promise<number> {
+  await dbConnect();
+  const profile = await StudentProfile.findOne({ user: userId }).select('participantCode').lean();
+  if (!profile?.participantCode) return 0;
+  return AnalyticsEvent.countDocuments({
+    participantCode: profile.participantCode,
+    eventType,
+    occurredAt: { $gte: since },
+  });
 }

@@ -67,6 +67,22 @@ export async function getMentor(mentorId: string): Promise<MentorDTO | null> {
 }
 
 /**
+ * Approved mentors by id, in the order given, with their next open slot. Used
+ * for the bridge, whose order is its ranking. A mentor suspended since being
+ * surfaced is left out rather than shown to a student.
+ */
+export async function getMentorsByIds(ids: string[]): Promise<MentorDTO[]> {
+  const valid = ids.filter((id) => isValidObjectId(id));
+  if (valid.length === 0) return [];
+  await dbConnect();
+
+  const docs = await MentorProfile.find({ _id: { $in: valid }, vetted: true }).lean();
+  const byId = new Map(docs.map((d) => [String(d._id), d]));
+  const ordered = valid.map((id) => byId.get(id)).filter((d) => d !== undefined);
+  return withNextSlots(ordered.map(toMentorDTO));
+}
+
+/**
  * Fill in `nextSlotAt` for a page of mentors.
  *
  * Runs the same slot generator the booking flow uses, so "Available this week"

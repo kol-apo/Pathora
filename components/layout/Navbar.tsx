@@ -7,10 +7,15 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { ChevronDown, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
 
+/**
+ * The public site's sections. Everything else (mentors, Pathy, opportunities,
+ * sessions) lives in the signed-in app, reached from the sidebar.
+ */
 const links = [
-  { label: 'Explore', href: '/explore', match: ['/explore', '/consultants'] },
-  { label: 'Career Discovery', href: '/discover', match: ['/discover'] },
-  { label: 'Opportunities', href: '/dashboard#opportunities', match: [] as string[] },
+  { label: 'How it works', href: '/#how-it-works', match: [] as string[] },
+  { label: 'Sectors', href: '/#sectors', match: [] as string[] },
+  { label: 'For mentors', href: '/#for-mentors', match: ['/become-a-mentor'] },
+  { label: 'About', href: '/#about', match: [] as string[] },
 ];
 
 /** True when the current page belongs to this link's section. */

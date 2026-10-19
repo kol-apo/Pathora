@@ -16,7 +16,7 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 
 ## Three design decisions worth reading first
 
-1. **The model proposes; the database matches.** The language model decides direction: a sector, a five-axis interest vector, a phased plan, and the questions to ask a human. It never chooses which human. The server ranks consultants deterministically from the vector, so the same roadmap always surfaces the same consultants, and any match can be reproduced and audited without re-running the model. See `layer_1_identity` in [prompts/discovery.json](prompts/discovery.json) and `surfaceBridgeConsultants()` in [lib/db/queries/bridge.ts](lib/db/queries/bridge.ts).
+1. **The model proposes; the database matches.** The language model decides direction: a sector, a phased plan, and the questions to ask a human. It never chooses which human. The server ranks consultants deterministically from a five-axis interest vector, so the same answers always surface the same consultants, and any match can be reproduced and audited without re-running the model. In the running app the vector is calculated from the student's answers (`studentVectorFor()` in [lib/discovery/questions.ts](lib/discovery/questions.ts)); the research specification has the model supply it. See `layer_1_identity` in [prompts/discovery.json](prompts/discovery.json) and `surfaceBridgeConsultants()` in [lib/db/queries/bridge.ts](lib/db/queries/bridge.ts).
 2. **Hallucinated opportunities are structurally impossible, not just discouraged.** Programmes may only be named from a curated allow-list, the `VerifiedResource` collection. A post-generation validator rejects any roadmap that names a programme outside it, whether or not the programme exists. The database and the validator both load the list from one file, [lib/research/verified-resources.json](lib/research/verified-resources.json), so they cannot drift apart.
 3. **Double-booking is defended twice, and the database has the final say.** Validation in code catches made-up or already-taken times; the unique index catches the race that validation cannot, two requests checking at the same instant. The second write fails inside MongoDB and becomes the handled `SLOT_TAKEN` response, so the student sees "Someone just booked that slot" rather than an error.
 
@@ -24,15 +24,21 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 
 | Component | State |
 | --- | --- |
-| Next.js application | Built. Explore, consultant profiles, booking with slot selection, and Career Discovery (a chat with the Pathora Guide) work, reading and writing MongoDB. |
-| Data layer (MongoDB) | Built and tested: 11 collections, the bridge, access rules and research reports. `npm run verify` (178 checks) and `npm run verify:db` (26 checks) pass. |
+| Next.js application | Built. A public landing page (how it works, sectors, a section for mentors, about); everything else is inside the signed-in student app: Overview, Mentors, Career Discovery (speaking with Pathy), Opportunities and Sessions. Sign-up goes through research consent straight to the dashboard. |
+| Discovery and the bridge | Built. A consented student's result is saved with its interest vector, and its three mentors are surfaced and recorded. Opening one of their profiles records the view; booking from it records a bridge booking. Saved results have their own roadmap page (`/discover/results/:id`). Only mentors taking bookings are matched. |
+| Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
+| Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
+| Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. |
+| Data layer (MongoDB) | Built and tested: 11 collections, the bridge, access rules and research reports. `npm run verify` (266 checks) and `npm run verify:db` (49 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. |
+| Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
 | Admin console (`/admin`) | Built: platform counts and the research reports, and mentor review (approve with an interest profile, reject, suspend, reinstate). |
 | `prompts/discovery.json` | Specified, and validated offline by `prompts/validate_prompt.py`. **No live generation yet:** no code calls the Claude API with this specification. |
-| Discovery wired to the research data | **Not yet.** Career Discovery still uses its own prompt (`lib/ai/prompt.ts`), does not save results (that needs sign-in), and produces no interest vector, so the bridge cannot run from the app yet. The results page still shows sample consultants. |
+| Research events | Recorded on the server under the student's participant code: discovery completed, bridge surfaced, bridge profile viewed, booking requested, booking cancelled, Pathy message sent (never its text). Payloads carry no ids. Students who have not consented are not recorded. |
+| Live AI | Gemini, on Google's free tier for now, through its OpenAI-compatible endpoint (set the `AI_*` variables; see `.env.example`). With no key, Career Discovery runs on the offline matcher, which is also the fallback if Gemini fails. It uses the app's own prompt (`lib/ai/prompt.ts`), not `prompts/discovery.json`, which was written for Claude. On the free tier Google may use prompts and responses to improve its products, and human reviewers may read them, so it is for testing until the consent form covers it or a paid tier is used. |
 | Live video | Not built. The data model already records session timing (`VideoSession`); the session room is still a mock-up. |
-| Student dashboard | Shows the signed-in student's name, but its figures are still sample data. |
+| Student Overview | Built on the student's own data, in reading order: the one next step, their direction and sessions, their three matched mentors, and opportunities in their field. |
 | Consent wording | Placeholder, marked as a draft on screen, until the approved consent form is added to `lib/research/consent.ts`. |
 | Deployment | Not deployed. See [Deployment plan](#deployment-plan). |
 
@@ -111,15 +117,16 @@ https://github.com/kol-apo/Pathora
 | `AUTH_SECRET` | Yes | Signs the sign-in cookie. Any long random string; see `.env.example` for a command that makes one |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Only for Google sign-in | From Google Cloud Console. Without them the site offers email and password only |
 | `AI_PROVIDER` | No | `mock` (default, offline, no key) or `openai-compatible` |
-| `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Only for a live AI model | Any service that uses the OpenAI chat format, such as Groq, OpenRouter, Gemini or Ollama |
+| `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Only for a live AI model | Any service that uses the OpenAI chat format, such as Groq, OpenRouter, Gemini or Ollama. Without one, Pathy cannot chat and says so |
+| `CRON_SECRET` | Only when deployed | Lets a scheduler call `/api/cron/opportunities` to read the opportunity feeds |
 
 The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` it scores the answers offline, and the same offline scoring is the fallback if a live model fails.
 
 ### Checking that it works
 
 ```bash
-npm run verify      # 192 offline checks: slots, timezones, matching, model rules, accounts, AI output. No database needed
-npm run verify:db   # 26 live checks: double booking, the bridge, access rules, reports
+npm run verify      # 266 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
+npm run verify:db   # 49 live checks: double booking, the bridge, saving results, cancelling, access rules, research events, opportunities, reports
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
@@ -132,6 +139,8 @@ npm run build       # production build
 https://www.figma.com/design/xgHTY50iOunFJr3s896yQ0/Pathora?node-id=0-1&t=TDUUwpzVr3hUhNx9-1
 
 ### Screenshots of the app
+
+These were captured before the student app was reorganised around the sidebar and Pathy's chat; the landing page, Overview, Career Discovery, Opportunities and Sessions now look different.
 
 Captured from the running app against a seeded database. The student, mentor and admin accounts are test accounts.
 
@@ -187,7 +196,7 @@ The full results page, with the three-year roadmap and three consultants in the 
 
 ![Booking confirmed](docs/screenshots/13-booking-confirmed.png)
 
-**Student dashboard** (sample data)
+**Student dashboard**
 
 ![Student dashboard](docs/screenshots/14-student-dashboard.png)
 

@@ -33,6 +33,10 @@ export function toConsultant(m: MentorDTO): Consultant {
     company: m.company,
     sector: m.sector,
     experience: m.experience,
+    country: m.country,
+    photo: m.photo,
+    source: m.source,
+    bookable: m.acceptingBookings,
     focus: m.focus,
     tags: m.tags,
     bio: m.bio,
@@ -43,4 +47,22 @@ export function toConsultant(m: MentorDTO): Consultant {
     socials: m.socials,
     links: m.links,
   };
+}
+
+/**
+ * The line under a mentor's name: role and employer, or role and country when
+ * the employer is not known (as for partner mentors listed from a directory).
+ */
+export function roleLine(m: { role: string; company: string; country?: string | null }): string {
+  return [m.role, m.company || m.country].filter(Boolean).join(' · ');
+}
+
+/**
+ * Mentors from partner organisations first, everyone else after, each group
+ * keeping its existing order. Stable, so a sort chosen by the student still
+ * applies within each group.
+ */
+export function partnersFirst<T extends { source?: string }>(list: T[]): T[] {
+  const isPartner = (m: T) => !!m.source && m.source !== 'pathora';
+  return [...list.filter(isPartner), ...list.filter((m) => !isPartner(m))];
 }

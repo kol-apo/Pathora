@@ -3,6 +3,7 @@ import dbConnect from '../connect';
 import { Availability, Booking, BridgeRecommendation, DiscoveryResult, MentorProfile } from '../models';
 import { ACTIVE_BOOKING_STATUSES, type BookingStatus } from '../models/Booking';
 import { findSlot } from '@/lib/booking/slots';
+import type { Sector } from '@/lib/types';
 import { DataError, isDuplicateKeyError } from './errors';
 import { busyIntervalsFor } from './mentors';
 import { toBookingDTO, type BookingDTO } from './dto';
@@ -82,6 +83,9 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
         `A ${mentor.sector} mentor cannot be booked through the bridge of a ${result.primary.sector} result.`,
       );
     }
+    if (viaBridge && !(await BridgeRecommendation.exists({ discoveryResult: discoveryResultId, mentor: mentorId }))) {
+      throw new DataError('BRIDGE_NOT_SURFACED', 'This mentor was not recommended on that result.');
+    }
   }
 
   const rules = await Availability.findOne({ mentor: mentorId }).lean();
@@ -112,9 +116,16 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
     });
 
     if (viaBridge) {
+      // Booking implies the profile was seen. Stamp the view first if the
+      // view call never arrived, so the funnel never shows a booking without one.
+      const stampedAt = new Date();
+      await BridgeRecommendation.updateOne(
+        { discoveryResult: discoveryResultId, mentor: mentorId, viewedAt: { $exists: false } },
+        { $set: { viewedAt: stampedAt } },
+      );
       await BridgeRecommendation.updateOne(
         { discoveryResult: discoveryResultId, mentor: mentorId, bookedAt: { $exists: false } },
-        { $set: { bookedAt: new Date() } },
+        { $set: { bookedAt: stampedAt } },
       );
     }
     return toBookingDTO(created.toObject());
@@ -247,6 +258,52 @@ export async function setBookingStatus(
   }
 
   return toBookingDTO(doc.toObject());
+}
+
+/**
+ * What the research log records about a booking: the mentor's sector and, for
+ * a bridge booking, the mentor's rank on the result. No ids leave this function.
+ */
+export async function bookingStudyDetails(
+  booking: BookingDTO,
+): Promise<{ sector: Sector; viaBridge: boolean; rank: number | null }> {
+  await dbConnect();
+  const mentorId = typeof booking.mentor === 'string' ? booking.mentor : booking.mentor.id;
+  const [mentor, rec] = await Promise.all([
+    MentorProfile.findById(mentorId).select('sector').lean(),
+    booking.viaBridge && booking.discoveryResult
+      ? BridgeRecommendation.findOne({ discoveryResult: booking.discoveryResult, mentor: mentorId })
+          .select('rank')
+          .lean()
+      : null,
+  ]);
+  return { sector: mentor!.sector, viaBridge: booking.viaBridge, rank: rec?.rank ?? null };
+}
+
+/**
+ * A student cancels one of their own sessions, before it starts.
+ *
+ * Someone else's booking gives BOOKING_NOT_FOUND, the same as a missing one,
+ * so booking ids cannot be probed. Cancelling frees the slot straight away. A
+ * bridge booking keeps its bookedAt: the study measures whether the bridge led
+ * to a booking, and a later cancellation is reported separately.
+ */
+export async function cancelBookingForStudent(
+  bookingId: string,
+  studentId: string,
+  now = new Date(),
+): Promise<BookingDTO> {
+  if (!isValidObjectId(bookingId) || !isValidObjectId(studentId)) {
+    throw new DataError('INVALID_ID', 'Malformed id.');
+  }
+  await dbConnect();
+
+  const doc = await Booking.findOne({ _id: bookingId, student: studentId }).select('startsAt').lean();
+  if (!doc) throw new DataError('BOOKING_NOT_FOUND', 'No such booking.');
+  if (new Date(doc.startsAt) <= now) {
+    throw new DataError('SESSION_STARTED', 'This session has already started, so it can no longer be cancelled.');
+  }
+  return setBookingStatus(bookingId, 'cancelled', studentId, 'Cancelled by the student');
 }
 
 export async function addBookingNote(

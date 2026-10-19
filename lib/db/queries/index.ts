@@ -15,3 +15,5 @@ export * from './research';
 export * from './accounts';
 export * from './admin';
 export * from './mentorConsole';
+export * from './discovery';
+export * from './opportunities';

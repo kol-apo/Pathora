@@ -41,7 +41,7 @@ function ChatCard() {
   return (
     <div className="flex flex-col gap-2">
       <div className="max-w-[240px] rounded-2xl rounded-bl-md border border-sky-muted bg-white px-4 py-3 shadow-card">
-        <p className="text-[11px] font-semibold text-navy">Pathora Guide</p>
+        <p className="text-[11px] font-semibold text-navy">Pathy</p>
         <p className="mt-0.5 text-[13.5px] leading-snug text-ink">What do you love figuring out?</p>
       </div>
       <div className="ml-10 max-w-[230px] self-start rounded-2xl rounded-br-md bg-navy px-4 py-3 text-[13.5px] leading-snug text-white shadow-card">
@@ -137,7 +137,7 @@ export default function HeroJourney({ consultant }: { consultant: Consultant }) 
     <div
       className="relative overflow-hidden rounded-[28px] border border-sky-muted bg-gradient-to-br from-sky-soft via-white to-sky-soft"
       role="img"
-      aria-label="How Pathora works: talk to the Pathora Guide, get a career direction, then book a session with a professional already working in it."
+      aria-label="How Pathora works: speak with Pathy, get a career direction, then book a session with a professional already working in it."
     >
       {/* Dotted grid, fading out towards the edges */}
       <div

@@ -56,7 +56,7 @@ export default async function MentorHomePage() {
     <ConsoleFrame
       variant="mentor"
       title={`Welcome, ${firstName}`}
-      subtitle={`${me.role} · ${me.company} · ${me.sector}`}
+      subtitle={[me.role, me.company, me.sector].filter(Boolean).join(' · ')}
     >
       {me.status !== 'approved' ? (
         <section className="flex flex-col gap-5 rounded-xl border border-sky-muted bg-sky-soft p-6 sm:flex-row sm:items-center">
@@ -107,7 +107,7 @@ export default async function MentorHomePage() {
                   </p>
                   <p className="text-[13.5px] text-muted">
                     {b.topic}
-                    {b.viaBridge && ' · matched through career discovery'}
+                    {b.viaBridge && ' · matched to you by Pathy'}
                   </p>
                 </div>
                 <BookingResponse bookingId={b.id} studentName={b.studentName} />

@@ -16,10 +16,10 @@ export default function ReviewingState() {
         <div className="animate-bar h-0.5 w-[32%] bg-navy motion-reduce:animate-none" />
       </div>
       <h2 className="text-[26px] font-semibold tracking-[-0.02em] text-ink">
-        Reviewing your answers
+        Pathy is reviewing your answers
       </h2>
       <p className="max-w-[380px] text-[15px] leading-relaxed text-muted">
-        Matching what you told us against 14 career paths and the consultants working in them.
+        Working out a direction that fits you, and the mentors already working in it.
       </p>
     </div>
   );

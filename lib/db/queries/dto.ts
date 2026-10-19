@@ -1,6 +1,8 @@
 import type { Types } from 'mongoose';
 import type { Sector } from '@/lib/types';
 import type { BookingStatus } from '../models/Booking';
+import type { MentorSource } from '@/lib/partners';
+import { SOURCES, type OpportunitySource, type OpportunityType } from '@/lib/opportunities/sources';
 
 /**
  * Plain shapes for crossing the server/client boundary.
@@ -16,9 +18,14 @@ export interface MentorDTO {
   displayName: string;
   initials: string;
   role: string;
+  /** Empty when not known. */
   company: string;
   sector: Sector;
-  experience: number;
+  /** Null when not known. */
+  experience: number | null;
+  country: string | null;
+  photo: string | null;
+  source: MentorSource;
   focus: string[];
   tags: string[];
   bio: string;
@@ -78,12 +85,18 @@ export interface OpportunityDTO {
   id: string;
   title: string;
   organisation: string;
-  type: string;
-  sector: Sector;
+  type: OpportunityType;
+  /** Null when it is open to any sector. */
+  sector: Sector | null;
   description: string;
   url: string;
-  /** ISO date, or null for rolling applications. */
+  /** ISO date, or null when no deadline is stated. */
   deadline: string | null;
+  source: OpportunitySource;
+  /** The publisher's name, e.g. "Opportunity Desk". */
+  sourceName: string;
+  /** ISO date the publisher posted it, if known. */
+  publishedAt: string | null;
 }
 
 const id = (v: Types.ObjectId | string): string => String(v);
@@ -98,7 +111,10 @@ export function toMentorDTO(doc: any): MentorDTO {
     role: doc.role,
     company: doc.company,
     sector: doc.sector,
-    experience: doc.experience,
+    experience: typeof doc.experience === 'number' ? doc.experience : null,
+    country: doc.country || null,
+    photo: doc.photo || null,
+    source: doc.source ?? 'pathora',
     focus: doc.focus ?? [],
     tags: doc.tags ?? [],
     bio: doc.bio,
@@ -146,10 +162,13 @@ export function toOpportunityDTO(doc: any): OpportunityDTO {
     title: doc.title,
     organisation: doc.organisation,
     type: doc.type,
-    sector: doc.sector,
-    description: doc.description,
+    sector: doc.sector ?? null,
+    description: doc.description ?? '',
     url: doc.url,
     deadline: doc.deadline ? new Date(doc.deadline).toISOString() : null,
+    source: doc.source ?? 'pathora',
+    sourceName: SOURCES[doc.source as OpportunitySource]?.name ?? 'Pathora',
+    publishedAt: doc.publishedAt ? new Date(doc.publishedAt).toISOString() : null,
   };
 }
 

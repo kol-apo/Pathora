@@ -34,7 +34,6 @@ export default async function WelcomePage() {
       subtitle="One thing before you start. Pathora is part of a research study, so we need your agreement."
     >
       <ConsentForm
-        firstName={firstName}
         title={CONSENT_TITLE}
         points={CONSENT_POINTS}
         agreement={CONSENT_AGREEMENT}

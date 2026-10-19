@@ -21,6 +21,8 @@ export type DataErrorCode =
   | 'INSUFFICIENT_CONSULTANTS'
   | 'BRIDGE_REQUIRES_RESULT'
   | 'BRIDGE_SECTOR_MISMATCH'
+  | 'BRIDGE_NOT_SURFACED'
+  | 'SESSION_STARTED'
   | 'EMAIL_TAKEN'
   | 'ACCOUNT_EXISTS'
   | 'NOT_A_STUDENT'
@@ -28,7 +30,9 @@ export type DataErrorCode =
   | 'NOT_A_MENTOR'
   | 'INVALID_VECTOR'
   | 'INVALID_AVAILABILITY'
-  | 'INVALID_APPLICATION';
+  | 'INVALID_APPLICATION'
+  | 'INVALID_OPPORTUNITY'
+  | 'TOO_MANY_MESSAGES';
 
 export class DataError extends Error {
   constructor(
@@ -61,6 +65,10 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   INSUFFICIENT_CONSULTANTS: 409,
   BRIDGE_REQUIRES_RESULT: 400,
   BRIDGE_SECTOR_MISMATCH: 409,
+  // Only the three mentors recorded on a result count as bridge bookings.
+  BRIDGE_NOT_SURFACED: 409,
+  // A session that has begun can no longer be cancelled by the student.
+  SESSION_STARTED: 409,
   EMAIL_TAKEN: 409,
   // A Google sign-in for an email that already has a password account.
   ACCOUNT_EXISTS: 409,
@@ -70,6 +78,9 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   INVALID_VECTOR: 422,
   INVALID_AVAILABILITY: 422,
   INVALID_APPLICATION: 422,
+  INVALID_OPPORTUNITY: 422,
+  // Pathy's daily message allowance, which keeps the free AI quota for everyone.
+  TOO_MANY_MESSAGES: 429,
 };
 
 export function statusForError(err: unknown): number {

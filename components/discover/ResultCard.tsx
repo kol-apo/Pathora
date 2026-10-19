@@ -95,7 +95,7 @@ export function SecondaryResultCard({ match }: { match: CareerMatch }) {
         ))}
       </div>
       <Link
-        href="/explore"
+        href={`/explore?sector=${encodeURIComponent(match.sector)}`}
         className="mt-5 inline-block text-sm font-medium text-ink underline-offset-4 hover:underline"
       >
         Explore this path →

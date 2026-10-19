@@ -32,7 +32,7 @@ export default async function BecomeAMentorPage() {
           <ul className="mt-8 space-y-5">
             {[
               { icon: CalendarDays, title: 'On your schedule', body: 'Set the hours that suit you. Students book 45-minute video calls inside them.' },
-              { icon: HeartHandshake, title: 'Matched to you', body: 'Students reach you through Career Discovery, already pointed at your field.' },
+              { icon: HeartHandshake, title: 'Matched to you', body: 'Students reach you after Pathy has pointed them at your field.' },
               { icon: ShieldCheck, title: 'Vetted', body: 'Every mentor is reviewed by the Pathora team before students can see them.' },
             ].map(({ icon: Icon, title, body }) => (
               <li key={title} className="flex gap-4">

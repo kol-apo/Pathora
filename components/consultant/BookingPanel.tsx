@@ -40,9 +40,12 @@ const longFormat = new Intl.DateTimeFormat('en-GB', {
 export default function BookingPanel({
   consultant,
   onBooked,
+  bridgeResultId = null,
 }: {
   consultant: Consultant;
   onBooked: (message: string) => void;
+  /** The student's discovery result, when this mentor was recommended on it. */
+  bridgeResultId?: string | null;
 }) {
   const [step, setStep] = useState<Step>('idle');
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -54,7 +57,7 @@ export default function BookingPanel({
   const [needsSignIn, setNeedsSignIn] = useState(false);
   const [bookedAt, setBookedAt] = useState<Date | null>(null);
 
-  const available = consultant.nextSlot === null;
+  const available = consultant.bookable !== false && consultant.nextSlot === null;
   const firstName = consultant.name.split(' ')[0];
 
   const days = useMemo(() => groupSlotsByDay(slots, studentZone()), [slots]);
@@ -100,6 +103,7 @@ export default function BookingPanel({
           // Sent back exactly as received — the server matches it to a slot start.
           startsAt: selected.startsAt.toISOString(),
           topic: topic.trim() || DEFAULT_TOPIC,
+          ...(bridgeResultId ? { discoveryResultId: bridgeResultId, viaBridge: true } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -141,7 +145,7 @@ export default function BookingPanel({
   };
 
   return (
-    <div className="sticky top-[92px] rounded-lg border border-line p-[22px]">
+    <div className="sticky top-8 rounded-lg border border-line p-[22px]">
       <h2 className="text-xl font-semibold tracking-[-0.02em] text-ink">Book a free session</h2>
       <p className="mt-2 text-[13.5px] text-muted">1:1 video session · 45 minutes · Free</p>
       <p className="mt-3 flex items-center gap-[7px] text-[13px]">
@@ -150,11 +154,29 @@ export default function BookingPanel({
           aria-hidden="true"
         />
         <span className={available ? 'text-available' : 'text-muted'}>
-          {available ? 'Available this week' : `Next slot ${consultant.nextSlot}`}
+          {consultant.bookable === false
+            ? 'Not taking bookings yet'
+            : available
+              ? 'Available this week'
+              : `Next slot ${consultant.nextSlot}`}
         </span>
       </p>
 
-      {step === 'idle' && (
+      {consultant.bookable === false && (
+        <div className="mt-5 rounded-lg border border-dashed border-line bg-surface px-4 py-6 text-center">
+          <p className="text-[13px] leading-relaxed text-muted">
+            {firstName} hasn&apos;t opened sessions on Pathora yet. You can book anyone else straight away.
+          </p>
+          <Link
+            href={`/explore?sector=${encodeURIComponent(consultant.sector)}`}
+            className="mt-4 inline-block text-[12.5px] font-medium text-ink underline underline-offset-2"
+          >
+            Browse {consultant.sector} consultants
+          </Link>
+        </div>
+      )}
+
+      {step === 'idle' && consultant.bookable !== false && (
         <>
           <div className="mt-5 flex h-36 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-line bg-surface text-faint">
             <CalendarDays size={24} strokeWidth={1.5} />

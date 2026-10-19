@@ -10,7 +10,18 @@ import type { UserRole } from '@/lib/db/models/User';
  */
 
 /** Pages that need a signed-in user. */
-const PROTECTED = ['/dashboard', '/session', '/welcome', '/admin', '/mentor'];
+const PROTECTED = [
+  '/dashboard',
+  '/explore',
+  '/consultants',
+  '/discover',
+  '/opportunities',
+  '/sessions',
+  '/session',
+  '/welcome',
+  '/admin',
+  '/mentor',
+];
 
 export const authConfig = {
   pages: {

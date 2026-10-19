@@ -16,7 +16,7 @@ Eleven collections. The first seven run the application; the last four hold the 
 | `availabilities` (`Availability`) | A mentor's weekly hours, from which open slots are calculated |
 | `bookings` (`Booking`) | A student's session with a mentor |
 | `discoveryresults` (`DiscoveryResult`) | One completed career discovery: the answers, the generated roadmap, and its provenance |
-| `opportunities` (`Opportunity`) | Fellowships, internships and similar openings shown on the dashboard |
+| `opportunities` (`Opportunity`) | Scholarships, fellowships, internships and jobs: read from publishers' feeds, or added by an admin (ALU SPD) |
 | `bridgerecommendations` (`BridgeRecommendation`) | The three mentors surfaced on each discovery result, and when each was viewed and booked |
 | `verifiedresources` (`VerifiedResource`) | The allow-list of real programmes the AI may name |
 | `analyticsevents` (`AnalyticsEvent`) | Research interaction events, under a pseudonymous code only |
@@ -52,6 +52,9 @@ erDiagram
 | `sector` | `Entrepreneurship`, `Technology`, `Finance` or `Creative` |
 | `codeOfConductOk` | Agreed to the code of conduct during application |
 | `socials` | Optional LinkedIn and X addresses. LinkedIn must be on linkedin.com; X accepts a link or an `@handle`, stored as a full x.com link |
+| `source` | `pathora` for someone who applied here, or the partner organisation that listed them (`jointhub`). Partner mentors are marked on their cards and profiles |
+| `photo` | Optional headshot: a file under `/public/mentors`, or an `https` address. Nothing else is accepted, so no other kind of address reaches an image tag |
+| `company`, `experience` | Optional. Partner mentors are listed from a directory that gives neither, and the site says nothing rather than show a made-up employer or "0 years" |
 | `links` | Up to five other links, each a portfolio, publication, video or website, with an optional title. Only `http(s)` addresses are stored, so a `javascript:` link can never reach a student |
 
 Indexes: `user` (unique); `status`; `sector`; `{ vetted, sector, experience }` for the Explore listing; a weighted text index on name, role, company, focus and tags for search.
@@ -110,7 +113,7 @@ One per booking (`booking` is unique). It holds the room link, when each party j
 
 ### `User`, `Availability`, `Opportunity`
 
-`User.email` is unique and `role` is indexed. Each mentor has exactly one `Availability` (`mentor` is unique), holding weekly windows in the mentor's own timezone. `Opportunity` is indexed on `{ published, sector, deadline }`.
+`User.email` is unique and `role` is indexed. Each mentor has exactly one `Availability` (`mentor` is unique), holding weekly windows in the mentor's own timezone. `Opportunity.url` is unique (`one_listing_per_url`), so reading a feed again updates a listing rather than duplicating it; only `http(s)` links are stored. `sector` is null for listings open to every field, `deadline` is null when none is stated, and `source` names the publisher, shown with every listing. A listing an admin takes down has `published: false` and stays hidden on later refreshes. Also indexed on `{ published, deadline }` and `{ published, sector, deadline }`.
 
 ## How the key rules are enforced
 
@@ -129,10 +132,11 @@ Verified by `npm run verify:db`: five simultaneous bookings for one slot, exactl
 
 `surfaceBridgeConsultants()` in [`lib/db/queries/bridge.ts`](../lib/db/queries/bridge.ts):
 
-- It ranks approved mentors **in the result's sector only**, by cosine similarity between the student's and each mentor's vector, and records the top three. Ties break by id, so the same vector always gives the same ranking.
+- It ranks approved mentors who are taking bookings, **in the result's sector only**, by cosine similarity between the student's and each mentor's vector, and records the top three. Ties break by id, so the same vector always gives the same ranking.
 - If the sector has fewer than three approved mentors with a vector, it refuses with `INSUFFICIENT_CONSULTANTS` rather than showing fewer.
 - Surfacing is recorded once per result; a repeat call returns the same three.
-- A bridge booking cannot leave the result's sector (`BRIDGE_SECTOR_MISMATCH`), and a successful one stamps `bookedAt`.
+- A bridge booking cannot leave the result's sector (`BRIDGE_SECTOR_MISMATCH`) and must be with one of the three mentors surfaced on it (`BRIDGE_NOT_SURFACED`). A successful one stamps `bookedAt`, and `viewedAt` too if no view was recorded, so the funnel never shows a booking without a view. A later cancellation keeps `bookedAt`: the study measures whether the bridge led to a booking, and cancellations are recorded as research events.
+- The student's vector is calculated from their answers by `studentVectorFor()` in [`lib/discovery/questions.ts`](../lib/discovery/questions.ts): each answer option carries a weight on each axis, summed with the same question weights as the sector score and scaled so the strongest axis is 1.
 
 Cosine is used because it compares only the direction of interests, not their size. A student who writes long answers is not scored as closer to everyone than one who writes short ones. Euclidean distance would mix the two up; Jaccard needs on/off sets, and these vectors are continuous scores.
 
@@ -147,7 +151,7 @@ MongoDB has no row-level security, so access rules live in the data layer. API r
 | Discovery results | Own only | Only with a booking linked to the result | Counts only |
 | Questionnaire answers | Own only | Never | Never |
 | Mentor profiles | Approved ones | Own profile | All, and approve, reject, suspend, reinstate |
-| Bookings | Own, and make new ones | Own sessions; confirm or decline requests | Counts only |
+| Bookings | Own; make new ones, and cancel before they start | Own sessions; confirm or decline requests | Counts only |
 | Students' contact details | Own | First name of students who booked them | Accounts only through the database |
 | Research reports | None | None | Read (aggregates) |
 | Research analytics | Write under own code | None | Read through reports |
@@ -158,7 +162,9 @@ Verified by `npm run verify:db`: owner, other student, surfaced-but-unbooked men
 
 **Roles.** Every account has one role: `student`, `mentor` or `admin`. Sign-up only ever creates students; mentors become mentors by applying, and admins are promoted with `npm run make-admin`, so nobody can choose a privileged role. The role is re-read from the database on every server request, so a change takes effect at once. API routes check it with `requireRole()` in [`lib/auth/guard.ts`](../lib/auth/guard.ts), and the `/admin` and `/mentor` page layouts check it before rendering. Verified by the browser tests: a student calling the admin or mentor API directly gets 403, and cannot open either console.
 
-**Not yet wired:** no route records analytics events yet. `logEvent()` stores whatever participant code it is given, so the route that records events must take the code from the signed-in student's profile, never from the request.
+**Research events.** `logStudentEvent()` in [`lib/db/queries/research.ts`](../lib/db/queries/research.ts) looks the participant code up from the signed-in student's profile, never from the request, so nobody can write events under another participant's code. Students who have not consented have no code and are not recorded. Payloads hold no ids at all, not even record ids, since a result or booking id leads back to a user. The events are `discovery_completed`, `bridge_surfaced`, `bridge_profile_viewed` (with the mentor's rank), `booking_requested` (with whether it came through the bridge, and the rank) `booking_cancelled` (with how many hours before the start), and `pathy_message` (the prompt version and model, and whether the fallback reply was used; never the text). Pathy's daily allowance is counted from these events.
+
+**Who is stored.** Only consented students' discovery results are saved; everything except the landing page needs sign-in and consent. Conversations with Pathy are not stored on the server at all: the student's browser keeps them for 24 hours and sends the recent turns with each message.
 
 ## Research reports
 

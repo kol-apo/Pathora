@@ -16,7 +16,7 @@ import {
 } from '@/lib/discovery/questions';
 
 /**
- * Career discovery as a conversation with the Pathora Guide.
+ * Career discovery as a conversation with Pathy, the Pathora guide.
  *
  * It asks the same six questions as before, from lib/discovery/questions.ts,
  * and produces the same DiscoveryAnswers, so the AI receives exactly what it
@@ -65,8 +65,8 @@ const QUESTIONS: Question[] = [
 ];
 
 const INTRO = [
-  "Hi, I'm your Pathora Guide.",
-  "I'll ask you six quick questions, then point you to a direction and to people already working in it. There are no wrong answers.",
+  "Hi, I'm Pathy, your Pathora guide.",
+  "I'll ask you six quick questions, then point you to a direction and to people already working in it. After that, you can ask me anything about your path. There are no wrong answers.",
 ];
 
 const STATUS_ACKS = [
@@ -233,11 +233,11 @@ export default function DiscoveryChat({
       <div className="mx-auto w-full max-w-[720px] flex-1 px-5 pb-8 pt-10 md:px-6">
         <div className="mb-10 flex flex-col items-center text-center">
           <Guide size={84} mood={done ? 'happy' : typing ? 'talking' : 'idle'} />
-          <p className="mt-5 text-[15px] font-semibold text-ink">Pathora Guide</p>
-          <p className="mt-0.5 text-[13px] text-muted">Career discovery · about 2 minutes</p>
+          <p className="mt-5 text-[15px] font-semibold text-ink">Speak with Pathy</p>
+          <p className="mt-0.5 text-[13px] text-muted">Six questions · about 2 minutes</p>
         </div>
 
-        <div className="flex flex-col gap-3" role="log" aria-live="polite" aria-label="Conversation with the Pathora Guide">
+        <div className="flex flex-col gap-3" role="log" aria-live="polite" aria-label="Conversation with Pathy">
           {messages.map((m) =>
             m.from === 'guide' ? (
               <div key={m.id} className="flex animate-pop-in items-end gap-2.5 motion-reduce:animate-none">

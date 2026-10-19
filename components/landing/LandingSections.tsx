@@ -1,12 +1,14 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowRight,
   ArrowUpRight,
   BarChart3,
+  CalendarClock,
   Check,
+  Compass,
   Cpu,
   Palette,
-  Quote,
   Rocket,
   ShieldCheck,
   type LucideIcon,
@@ -159,7 +161,7 @@ function BookVignette({ consultant: c }: { consultant: Consultant }) {
 export function HowItWorks({ consultant }: { consultant: Consultant }) {
   const steps = [
     {
-      title: 'Chat with the Guide',
+      title: 'Speak with Pathy',
       body: 'Six quick questions in a friendly conversation. It reads who you actually are, not what sounds impressive on paper.',
       visual: <ChatVignette />,
     },
@@ -176,7 +178,7 @@ export function HowItWorks({ consultant }: { consultant: Consultant }) {
   ];
 
   return (
-    <section id="how-it-works" className="border-t border-line px-5 py-24 md:px-10">
+    <section id="how-it-works" className="scroll-mt-20 border-t border-line px-5 py-24 md:px-10">
       <SectionHeader
         eyebrow="How it works"
         title="From not sure to talking to someone, in three steps"
@@ -232,11 +234,11 @@ const SECTOR_DETAILS: Record<Sector, { icon: LucideIcon; blurb: string; roles: s
 
 export function Sectors({ consultants }: { consultants: Consultant[] }) {
   return (
-    <section className="border-t border-line bg-gradient-to-b from-sky-soft/70 to-white px-5 py-24 md:px-10">
+    <section id="sectors" className="scroll-mt-20 border-t border-line px-5 py-24 md:px-10">
       <SectionHeader
         eyebrow="Sectors"
         title="Four sectors. Real professionals."
-        intro="Every consultant works in the industry today. No theorists, no career coaches who have never done the job."
+        intro="Every mentor is reviewed by the Pathora team before students can book them."
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -275,17 +277,28 @@ export function Sectors({ consultants }: { consultants: Consultant[] }) {
               <div className="relative mt-auto pt-6">
               <div className="flex items-center justify-between border-t border-line pt-5">
                 <div className="flex -space-x-1.5">
-                  {people.slice(0, 3).map((c) => (
-                    <span
-                      key={c.id}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-soft text-[10.5px] font-semibold text-navy ring-[3px] ring-white"
-                    >
-                      {c.initials}
-                    </span>
-                  ))}
+                  {people.slice(0, 3).map((c) =>
+                    c.photo ? (
+                      <Image
+                        key={c.id}
+                        src={c.photo}
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="h-9 w-9 rounded-full object-cover object-[50%_22%] ring-[3px] ring-white"
+                      />
+                    ) : (
+                      <span
+                        key={c.id}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-soft text-[10.5px] font-semibold text-navy ring-[3px] ring-white"
+                      >
+                        {c.initials}
+                      </span>
+                    ),
+                  )}
                 </div>
                 <span className="text-[13px] font-medium text-navy">
-                  {people.length} consultant{people.length === 1 ? '' : 's'}
+                  {people.length} mentor{people.length === 1 ? '' : 's'}
                 </span>
               </div>
               </div>
@@ -298,91 +311,104 @@ export function Sectors({ consultants }: { consultants: Consultant[] }) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
-   Testimonials
+   For mentors
    ────────────────────────────────────────────────────────────────────────── */
 
-const STORIES = [
+const MENTOR_POINTS: { icon: LucideIcon; title: string; body: string }[] = [
   {
-    quote:
-      'My consultant reviewed my Big 4 application line by line. I got the internship. Nothing else came close.',
-    outcome: 'Got the internship',
-    name: 'Salma B.',
-    role: 'Accounting, University of Ghana',
-    initials: 'SB',
+    icon: CalendarClock,
+    title: 'On your schedule',
+    body: 'Set the weekly hours that suit you. Students book 45-minute video sessions inside them.',
   },
   {
-    quote:
-      'I spent two years guessing what finance careers looked like. One session with a real analyst gave me more clarity than all of it.',
-    outcome: 'Clarity on finance',
-    name: 'Chiamaka U.',
-    role: 'Economics, University of Nigeria',
-    initials: 'CU',
+    icon: Compass,
+    title: 'Matched to you',
+    body: 'Students reach you after Pathy has pointed them at your field, so every session starts with context.',
   },
   {
-    quote:
-      'The questionnaire pointed me at product design, then showed me three designers to talk to. That bridge is the whole thing.',
-    outcome: 'Matched to product design',
-    name: 'Yannick H.',
-    role: 'Computer Science, ALU Rwanda',
-    initials: 'YH',
+    icon: ShieldCheck,
+    title: 'Vetted, both ways',
+    body: 'Every mentor is reviewed before students can book them, and every student has agreed to a code of conduct.',
   },
 ];
 
-export function Testimonials() {
-  const [featured, ...rest] = STORIES;
+export function ForMentors() {
   return (
-    <section id="about" className="border-t border-line px-5 py-24 md:px-10">
-      <SectionHeader eyebrow="Student stories" title="Students are already ahead" />
-
-      <div className="mt-14 grid gap-5 lg:grid-cols-12">
-        <figure className="relative flex flex-col justify-between overflow-hidden rounded-2xl bg-navy p-8 text-white md:p-10 lg:col-span-7">
-          <svg
-            viewBox="0 0 400 200"
-            className="pointer-events-none absolute -bottom-6 -right-6 w-[70%] opacity-30"
-            aria-hidden="true"
-          >
-            <path d="M10 190 C 120 170, 170 120, 230 90 S 340 30, 390 10" fill="none" stroke="#96CAD3" strokeWidth={26} strokeLinecap="round" />
-          </svg>
-          <div className="relative">
-            <Quote size={40} className="fill-sky text-sky" aria-hidden="true" />
-            <span className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[12px] font-medium text-sky">
-              <Check size={13} strokeWidth={2.5} />
-              {featured.outcome}
-            </span>
-            <blockquote className="mt-5 max-w-xl text-[22px] font-medium leading-[1.4] tracking-[-0.01em] md:text-[26px]">
-              {featured.quote}
-            </blockquote>
-          </div>
-          <figcaption className="relative mt-10 flex items-center gap-3">
-            <Avatar initials={featured.initials} size="sm" tone="dark" />
-            <div>
-              <p className="text-sm font-semibold">{featured.name}</p>
-              <p className="text-[12.5px] text-white/60">{featured.role}</p>
-            </div>
-          </figcaption>
-        </figure>
-
-        <div className="grid gap-5 lg:col-span-5">
-          {rest.map((t) => (
-            <figure
-              key={t.name}
-              className="flex flex-col rounded-2xl border border-sky-muted bg-white p-7 transition duration-300 hover:-translate-y-0.5 hover:shadow-raised"
+    <section id="for-mentors" className="scroll-mt-20 border-t border-line px-5 py-24 md:px-10">
+      <div className="grid gap-12 lg:grid-cols-12 lg:items-center">
+        <div className="lg:col-span-5">
+          <SectionHeader
+            eyebrow="For professionals"
+            title="Give one free session a month. Change a student's trajectory."
+            intro="You already know the route students are trying to find. Pathora brings you the ones heading your way."
+          />
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              href="/become-a-mentor"
+              className="group flex items-center gap-2 rounded bg-navy px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
             >
-              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-sky-soft px-3 py-1 text-[12px] font-medium text-navy">
-                <Check size={13} strokeWidth={2.5} />
-                {t.outcome}
-              </span>
-              <blockquote className="mt-4 text-[15.5px] leading-relaxed text-ink">{t.quote}</blockquote>
-              <figcaption className="mt-6 flex items-center gap-3">
-                <Avatar initials={t.initials} size="sm" />
-                <div>
-                  <p className="text-sm font-medium text-ink">{t.name}</p>
-                  <p className="text-[12.5px] text-muted">{t.role}</p>
-                </div>
-              </figcaption>
-            </figure>
-          ))}
+              Become a mentor
+              <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <Link
+              href="/signin?callbackUrl=%2Fmentor"
+              className="px-3 py-3.5 text-sm font-medium text-muted transition-colors hover:text-ink"
+            >
+              Already a mentor? Sign in
+            </Link>
+          </div>
         </div>
+
+        <ul className="grid gap-4 sm:grid-cols-3 lg:col-span-7">
+          {MENTOR_POINTS.map(({ icon: Icon, title, body }) => (
+            <li key={title} className="flex flex-col gap-3 rounded-2xl border border-sky-muted bg-white p-6">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy text-white">
+                <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+              </span>
+              <p className="text-[15px] font-semibold text-ink">{title}</p>
+              <p className="text-[13.5px] leading-relaxed text-muted">{body}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   About
+   ────────────────────────────────────────────────────────────────────────── */
+
+const ABOUT_FACTS: { title: string; body: string }[] = [
+  {
+    title: 'Advice that ends with a person',
+    body: 'Most career tools stop at a list of jobs. Every Pathora roadmap ends with three vetted professionals working in that field.',
+  },
+  {
+    title: 'Built for the African job market',
+    body: 'Pathy points to real routes in, real employers and real programmes, not advice that only works in the US or Europe.',
+  },
+  {
+    title: 'Free, private, and part of a study',
+    body: 'Sessions are free and never recorded. Pathora is a research study: your answers stay private and the research uses a code, not your name.',
+  },
+];
+
+export function About() {
+  return (
+    <section id="about" className="scroll-mt-20 border-t border-line bg-gradient-to-b from-sky-soft/70 to-white px-5 py-24 md:px-10">
+      <SectionHeader
+        eyebrow="About Pathora"
+        title="Find your direction, then talk to someone already in it."
+      />
+      <div className="mt-14 grid gap-5 md:grid-cols-3">
+        {ABOUT_FACTS.map((f, i) => (
+          <div key={f.title} className="flex flex-col gap-3 rounded-2xl border border-sky-muted bg-white p-7">
+            <span className="text-micro font-semibold uppercase text-navy">0{i + 1}</span>
+            <p className="text-[17px] font-semibold tracking-[-0.01em] text-ink">{f.title}</p>
+            <p className="text-[14px] leading-relaxed text-muted">{f.body}</p>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -420,21 +446,21 @@ export function ClosingCta() {
             </h2>
             <p className="mt-4 flex items-center gap-2 text-[14px] text-white/65">
               <ShieldCheck size={15} strokeWidth={1.75} className="text-sky" />
-              Every consultant is vetted by the Pathora team. Sessions are free.
+              Every mentor is vetted by the Pathora team. Sessions are free.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/explore"
+                href="/signup"
                 className="group flex items-center gap-2 rounded bg-white px-6 py-3.5 text-sm font-medium text-navy transition-colors hover:bg-sky-soft"
               >
-                Find a consultant
+                Create your free account
                 <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
               </Link>
               <Link
-                href="/discover"
+                href="/become-a-mentor"
                 className="rounded border border-white/25 px-6 py-3.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
               >
-                Chat with the Guide
+                Become a mentor
               </Link>
             </div>
           </div>

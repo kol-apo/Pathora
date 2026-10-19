@@ -23,7 +23,7 @@ import {
   VideoSession,
 } from '../lib/db/models';
 import catalogue from '../lib/research/verified-resources.json';
-import { consultants, currentStudent, opportunities } from '../lib/data';
+import { consultants, currentStudent } from '../lib/data';
 import { DEMO_STUDENT_EMAIL, slug } from '../lib/db/demo';
 
 const fresh = process.argv.includes('--fresh');
@@ -47,21 +47,6 @@ const PROFILE_VECTORS: Record<string, number[]> = {
   'David Okoro': [0.38, 0.18, 0.35, 0.95, 0.4],
   'Thandiwe Dlamini': [0.6, 0.35, 0.3, 0.88, 0.5],
 };
-
-/** "14 Sep" -> a Date this year, rolled to next year if already past. */
-function parseDeadline(text: string): Date | null {
-  if (!text || text.toLowerCase() === 'rolling') return null;
-  const [dayStr, monStr] = text.split(' ');
-  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  const month = months.indexOf((monStr ?? '').slice(0, 3).toLowerCase());
-  const day = Number(dayStr);
-  if (month < 0 || !Number.isFinite(day)) return null;
-
-  const now = new Date();
-  let date = new Date(Date.UTC(now.getUTCFullYear(), month, day, 23, 59, 0));
-  if (date < now) date = new Date(Date.UTC(now.getUTCFullYear() + 1, month, day, 23, 59, 0));
-  return date;
-}
 
 /** Mon/Wed/Fri, 09:00–12:00 and 14:00–17:00, in the mentor's own timezone. */
 const WEEKLY = [1, 3, 5].flatMap((dayOfWeek) => [
@@ -116,6 +101,12 @@ async function main() {
    * nothing will complain. Mongoose autoIndex is unreliable in production, so
    * it is done explicitly here.
    */
+  // Real opportunities come from publishers' feeds (npm run fetch-opportunities).
+  // Older seeds created placeholder samples with "#" as their link; remove them
+  // before building indexes, or the one-listing-per-link index cannot be built.
+  const removed = await Opportunity.deleteMany({ url: { $not: /^https?:\/\// } });
+  if (removed.deletedCount) console.log(`removed ${removed.deletedCount} sample opportunities`);
+
   await Promise.all([
     User.syncIndexes(),
     MentorProfile.syncIndexes(),
@@ -230,26 +221,6 @@ async function main() {
     { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
   );
   console.log(`seeded student ${studentEmail}`);
-
-  // ── Opportunities ─────────────────────────────────────────────────────────
-  for (const o of opportunities) {
-    await Opportunity.findOneAndUpdate(
-      { title: o.title },
-      {
-        $set: {
-          organisation: o.organisation,
-          type: o.type,
-          sector: o.sector,
-          description: o.description,
-          url: o.url,
-          deadline: parseDeadline(o.deadline),
-          published: true,
-        },
-      },
-      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
-    );
-  }
-  console.log(`seeded ${opportunities.length} opportunities`);
 
   // ── Verified resources (the prompt allow-list) ────────────────────────────
   for (const r of catalogue.resources) {

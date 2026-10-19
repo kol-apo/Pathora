@@ -21,13 +21,19 @@ import {
   BridgeRecommendation,
   DiscoveryResult,
   MentorProfile,
+  Opportunity,
+  StudentProfile,
   User,
 } from '../lib/db/models';
-import { createBooking } from '../lib/db/queries/bookings';
+import { cancelBookingForStudent, createBooking } from '../lib/db/queries/bookings';
+import { previewBridge, saveDiscoveryResult } from '../lib/db/queries/discovery';
+import { generateDiscovery } from '../lib/ai/discovery';
+import { studentVectorFor } from '../lib/discovery/questions';
 import { listAvailableSlots } from '../lib/db/queries/mentors';
-import { surfaceBridgeConsultants } from '../lib/db/queries/bridge';
+import { bridgeEligible, surfaceBridgeConsultants } from '../lib/db/queries/bridge';
 import { getDiscoveryResultForMentor, getDiscoveryResultForStudent } from '../lib/db/queries/access';
-import { bridgeFunnel, logEvent } from '../lib/db/queries/research';
+import { bridgeFunnel, countStudentEvents, logEvent, logStudentEvent } from '../lib/db/queries/research';
+import { addOpportunity, hideOpportunity, listOpportunities, refreshOpportunities } from '../lib/db/queries/opportunities';
 import { BRIDGE_SIZE, rankCandidates } from '../lib/matching/similarity';
 import { SECTORS } from '../lib/types';
 import { DataError } from '../lib/db/queries/errors';
@@ -120,12 +126,18 @@ async function main() {
 
   const studentIds = students.map((s) => s._id);
   let resultId: string | null = null;
+  let savedResultId: string | null = null;
 
   const cleanup = async () => {
     if (resultId) {
       await BridgeRecommendation.deleteMany({ discoveryResult: resultId });
       await DiscoveryResult.deleteMany({ _id: resultId });
     }
+    if (savedResultId) {
+      await BridgeRecommendation.deleteMany({ discoveryResult: savedResultId });
+      await DiscoveryResult.deleteMany({ _id: savedResultId });
+    }
+    await StudentProfile.deleteMany({ user: { $in: studentIds } });
     await AnalyticsEvent.deleteMany({ participantCode: RUN });
     await Booking.deleteMany({ student: { $in: studentIds } });
     await Booking.deleteMany({ mentor: mentor._id });
@@ -244,11 +256,7 @@ async function main() {
     const surfaced = await surfaceBridgeConsultants(resultId, { studentId: String(students[0]._id) });
 
     // Recompute the expected ranking independently from what is in the database.
-    const eligible = await MentorProfile.find({
-      vetted: true,
-      sector: 'Technology',
-      profileVector: { $exists: true },
-    }).lean();
+    const eligible = await MentorProfile.find(bridgeEligible('Technology')).lean();
     const expected = rankCandidates(
       studentVector,
       eligible.map((m) => ({ id: String(m._id), vector: m.profileVector })),
@@ -265,6 +273,10 @@ async function main() {
       'ranked by cosine similarity, matching an independent recomputation',
       JSON.stringify(surfaced.map((r) => r.mentorId)) === JSON.stringify(expected),
       `got ${surfaced.map((r) => r.mentorId)} expected ${expected}`,
+    );
+    ok(
+      'every surfaced mentor is taking bookings, so the bridge never leads to a dead end',
+      surfacedMentors.every((m) => m.acceptingBookings !== false),
     );
     const again = await surfaceBridgeConsultants(resultId);
     ok(
@@ -286,7 +298,7 @@ async function main() {
     const counts = await Promise.all(
       SECTORS.map(async (sector) => ({
         sector,
-        n: await MentorProfile.countDocuments({ vetted: true, sector, profileVector: { $exists: true } }),
+        n: await MentorProfile.countDocuments(bridgeEligible(sector)),
       })),
     );
     const thin = counts.find((c) => c.n < BRIDGE_SIZE);
@@ -332,9 +344,37 @@ async function main() {
       );
     }
 
+    // A same-sector mentor who was not one of the three cannot be booked "via the bridge".
+    const unsurfaced = await MentorProfile.findOne({
+      vetted: true,
+      sector: 'Technology',
+      _id: { $nin: surfaced.map((r) => r.mentorId) },
+    }).lean();
+    if (unsurfaced) {
+      const unsurfacedSlots = await listAvailableSlots(String(unsurfaced._id));
+      try {
+        await createBooking({
+          studentId: String(students[0]._id),
+          mentorId: String(unsurfaced._id),
+          startsAt: new Date(unsurfacedSlots[0].startsAt),
+          topic: 'Not surfaced',
+          discoveryResultId: resultId,
+          viaBridge: true,
+        });
+        ok('a bridge booking with a mentor not surfaced on the result is refused', false, 'it succeeded');
+      } catch (err) {
+        ok(
+          'a bridge booking with a mentor not surfaced on the result is refused (BRIDGE_NOT_SURFACED)',
+          err instanceof DataError && err.code === 'BRIDGE_NOT_SURFACED',
+        );
+      }
+    } else {
+      console.log('  INFO  every Technology mentor was surfaced, so BRIDGE_NOT_SURFACED cannot be tried here');
+    }
+
     const top = surfaced[0];
     const topSlots = await listAvailableSlots(top.mentorId);
-    await createBooking({
+    const bridgeBooking = await createBooking({
       studentId: String(students[0]._id),
       mentorId: top.mentorId,
       startsAt: new Date(topSlots[0].startsAt),
@@ -344,6 +384,39 @@ async function main() {
     });
     const rec = await BridgeRecommendation.findOne({ discoveryResult: resultId, mentor: top.mentorId }).lean();
     ok('a valid bridge booking stamps bookedAt on the recommendation', !!rec?.bookedAt);
+    ok(
+      'and stamps viewedAt too when no view was recorded, so the funnel stays in order',
+      !!rec?.viewedAt && rec.viewedAt <= rec.bookedAt!,
+    );
+
+    console.log('\n── Students cancelling ─────────────────────────────────────');
+    try {
+      await cancelBookingForStudent(bridgeBooking.id, String(students[1]._id));
+      ok("another student cannot cancel someone else's session", false, 'it succeeded');
+    } catch (err) {
+      ok(
+        "another student cannot cancel someone else's session (same 404 as a missing one)",
+        err instanceof DataError && err.code === 'BOOKING_NOT_FOUND',
+      );
+    }
+    try {
+      await cancelBookingForStudent(
+        bridgeBooking.id,
+        String(students[0]._id),
+        new Date(Date.parse(bridgeBooking.startsAt) + 60_000),
+      );
+      ok('a session that has started cannot be cancelled', false, 'it succeeded');
+    } catch (err) {
+      ok('a session that has started cannot be cancelled', err instanceof DataError && err.code === 'SESSION_STARTED');
+    }
+    const cancelled = await cancelBookingForStudent(bridgeBooking.id, String(students[0]._id));
+    ok('the owner can cancel before it starts', cancelled.status === 'cancelled');
+    ok(
+      'the cancelled slot is offered again at once',
+      (await listAvailableSlots(top.mentorId)).some((sl) => sl.startsAt === bridgeBooking.startsAt),
+    );
+    const recAfterCancel = await BridgeRecommendation.findOne({ discoveryResult: resultId, mentor: top.mentorId }).lean();
+    ok('the bridge still counts the booking it led to', !!recAfterCancel?.bookedAt);
 
     const funnel = await bridgeFunnel();
     const tech = funnel.find((f) => f.sector === 'Technology');
@@ -385,7 +458,123 @@ async function main() {
       'an event is stored under the participant code only',
       !!event && !Object.keys(event).some((k) => /user|student/i.test(k)),
     );
+
+    // A consented student's events go under their code, looked up on the server.
+    await StudentProfile.create({
+      user: students[3]._id,
+      initials: 'TS',
+      participantCode: RUN,
+      consentVersion: 'verify',
+      consentedAt: new Date(),
+    });
+    await logStudentEvent(String(students[3]._id), {
+      type: 'booking_requested',
+      payload: { sector: 'Technology', viaBridge: true, rank: 1 },
+    });
+    const studentEvent = await AnalyticsEvent.findOne({ participantCode: RUN, eventType: 'booking_requested' }).lean();
+    ok("a student's event is filed under their participant code", !!studentEvent);
+    ok(
+      'and its payload carries no ids',
+      !!studentEvent && !/[0-9a-f]{24}/.test(JSON.stringify(studentEvent.payload)),
+    );
+    const before = await AnalyticsEvent.countDocuments();
+    await logStudentEvent(String(students[4]._id), { type: 'bridge_surfaced', payload: { sector: 'Technology' } });
+    ok('a student who has not consented is not recorded', (await AnalyticsEvent.countDocuments()) === before);
+
+    console.log('\n── Saving a discovery ─────────────────────────────────────');
+    const answers = { status: 2, interests: [3], environment: 0, strength: 1, vision: 2 };
+    const outcome = await generateDiscovery(answers);
+    const saved = await saveDiscoveryResult(String(students[3]._id), answers, outcome);
+    savedResultId = saved.id;
+    const savedDoc = await DiscoveryResult.findById(saved.id).lean();
+    ok(
+      'a saved result carries the vector calculated from its answers',
+      JSON.stringify(savedDoc?.studentVector) === JSON.stringify(studentVectorFor(answers)),
+    );
+    ok(
+      'it is surfaced with three mentors straight away',
+      saved.bridge.status === 'ready' && saved.bridge.mentors.length === BRIDGE_SIZE,
+    );
+    const profileAfter = await StudentProfile.findOne({ user: students[3]._id }).lean();
+    ok("the student's profile points to it as their latest result", String(profileAfter?.latestDiscovery) === saved.id);
+    const preview = await previewBridge(answers, outcome.result.primary.sector);
+    ok(
+      'a visitor with the same answers sees the same three, in the same order',
+      preview.status === 'ready' &&
+        saved.bridge.status === 'ready' &&
+        JSON.stringify(preview.mentors.map((m) => m.id)) === JSON.stringify(saved.bridge.mentors.map((m) => m.id)),
+    );
+    console.log('\n── Opportunities ──────────────────────────────────────────');
+    const feedXml = `<rss><channel>
+      <item><title>Open Fellowship ${RUN}</title><link>https://example.org/${RUN}/open</link>
+        <description>Deadline: December 31, 2099 Applications are open.</description></item>
+      <item><title>Closed Grant ${RUN}</title><link>https://example.org/${RUN}/closed</link>
+        <description>Deadline: January 1, 2001 Too late.</description></item>
+    </channel></rss>`;
+    // A stand-in for the publishers: no network is touched.
+    const fakeFetch = (async () => new Response(feedXml, { status: 200 })) as unknown as typeof fetch;
+    const opportunityFilter = { url: { $regex: RUN } };
+
+    await refreshOpportunities({ fetchImpl: fakeFetch });
+    await refreshOpportunities({ fetchImpl: fakeFetch });
+    ok(
+      'reading the feeds twice stores each listing once',
+      (await Opportunity.countDocuments({ url: `https://example.org/${RUN}/open` })) === 1,
+    );
+    ok(
+      'a listing whose deadline has passed is not stored',
+      (await Opportunity.countDocuments({ url: `https://example.org/${RUN}/closed` })) === 0,
+    );
+    const listed = await listOpportunities({ limit: 500 });
+    const mine = listed.find((o) => o.url === `https://example.org/${RUN}/open`);
+    ok('it is listed for students, with its deadline and type', !!mine && mine.type === 'Fellowship' && !!mine.deadline);
+
+    await hideOpportunity(mine!.id);
+    await refreshOpportunities({ fetchImpl: fakeFetch });
+    ok(
+      'a listing an admin took down stays down after the next refresh',
+      !(await listOpportunities({ limit: 500 })).some((o) => o.id === mine!.id),
+    );
+
+    const added = await addOpportunity({
+      title: `ALU SPD placement ${RUN}`,
+      type: 'Internship',
+      sector: null,
+      url: `https://example.org/${RUN}/spd`,
+      deadline: null,
+      source: 'alu-spd',
+    });
+    ok('an admin can add an ALU SPD listing', added.sourceName === 'ALU SPD');
+    try {
+      await addOpportunity({
+        title: 'Duplicate',
+        type: 'Internship',
+        sector: null,
+        url: `https://example.org/${RUN}/spd`,
+        deadline: null,
+        source: 'alu-spd',
+      });
+      ok('the same link cannot be added twice', false, 'it succeeded');
+    } catch (err) {
+      ok('the same link cannot be added twice', err instanceof DataError && err.code === 'INVALID_OPPORTUNITY');
+    }
+    await Opportunity.deleteMany(opportunityFilter);
+
+    console.log('\n── Pathy allowance ────────────────────────────────────────');
+    const sinceStart = new Date(Date.now() - 60_000);
+    const pathyBefore = await countStudentEvents(String(students[3]._id), 'pathy_message', sinceStart);
+    await logStudentEvent(String(students[3]._id), {
+      type: 'pathy_message',
+      payload: { sector: 'Technology', promptVersion: 'verify', model: 'none', usedFallback: true },
+    });
+    ok(
+      "a student's Pathy messages are counted for the daily allowance",
+      (await countStudentEvents(String(students[3]._id), 'pathy_message', sinceStart)) === pathyBefore + 1,
+    );
+    const pathyEvent = await AnalyticsEvent.findOne({ participantCode: RUN, eventType: 'pathy_message' }).lean();
+    ok('and the event holds no message text', !!pathyEvent && !('content' in (pathyEvent.payload ?? {})) && !('message' in (pathyEvent.payload ?? {})));
   } finally {
+    await Opportunity.deleteMany({ url: { $regex: RUN } }).catch(() => {});
     await cleanup();
     console.log('\ncleaned up fixtures');
   }

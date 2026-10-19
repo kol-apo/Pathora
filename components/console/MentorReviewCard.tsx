@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import Avatar from '@/components/ui/Avatar';
+import PartnerMark from '@/components/consultant/PartnerMark';
+import { isPlaceholderEmail, partnerFor } from '@/lib/partners';
 import Badge from '@/components/ui/Badge';
 import ProfileLinks from '@/components/consultant/ProfileLinks';
 import { VECTOR_AXES } from '@/lib/matching/similarity';
@@ -26,6 +28,7 @@ export default function MentorReviewCard({ mentor }: { mentor: MentorReviewDTO }
   const [busy, setBusy] = useState<ReviewAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(mentor.status === 'pending_review');
+  const partner = partnerFor(mentor.source);
   const editable = mentor.status !== 'approved';
 
   const act = async (action: ReviewAction) => {
@@ -53,20 +56,21 @@ export default function MentorReviewCard({ mentor }: { mentor: MentorReviewDTO }
     <article className="rounded-xl border border-line">
       <div className="flex flex-col gap-4 p-5 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 gap-3.5">
-          <Avatar initials={mentor.initials} size="md" />
+          <Avatar initials={mentor.initials} photo={mentor.photo} size="md" />
           <div className="min-w-0">
             <p className="text-[16px] font-semibold text-ink">{mentor.displayName}</p>
             <p className="text-[13.5px] text-muted">
-              {mentor.role} · {mentor.company}
-              {mentor.country ? ` · ${mentor.country}` : ''}
+              {[mentor.role, mentor.company, mentor.country].filter(Boolean).join(' · ')}
             </p>
             <p className="mt-0.5 text-[12.5px] text-faint">
-              {mentor.email} · applied {new Date(mentor.appliedAt).toLocaleDateString('en-GB')}
+              {isPlaceholderEmail(mentor.email) ? 'No Pathora sign-in yet' : mentor.email} ·{' '}
+              {partner ? `listed from ${partner.name}` : 'applied'} {new Date(mentor.appliedAt).toLocaleDateString('en-GB')}
               {mentor.approvedBy ? ` · approved by ${mentor.approvedBy}` : ''}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               <Badge variant="sector">{mentor.sector}</Badge>
-              <Badge variant="tag">{mentor.experience} years</Badge>
+              {mentor.experience !== null && <Badge variant="tag">{mentor.experience} years</Badge>}
+              {partner && <PartnerMark partner={partner} />}
               {mentor.codeOfConductOk && <Badge variant="tag">Code of conduct agreed</Badge>}
             </div>
           </div>

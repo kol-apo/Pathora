@@ -27,15 +27,17 @@ interface NavItem {
   icon: LucideIcon;
   /** Highlight only on this exact path (section home pages). */
   exact?: boolean;
+  /** Other paths that belong to this section. */
+  also?: string[];
 }
 
 const NAV: Record<SidebarVariant, NavItem[]> = {
   student: [
     { label: 'Overview', href: '/dashboard', icon: LayoutDashboard, exact: true },
-    { label: 'Consultants', href: '/explore', icon: Users },
-    { label: 'Career path', href: '/discover', icon: Compass },
-    { label: 'Opportunities', href: '/dashboard#opportunities', icon: Briefcase },
-    { label: 'Sessions', href: '/session/1', icon: CalendarDays },
+    { label: 'Mentors', href: '/explore', icon: Users, also: ['/consultants'] },
+    { label: 'Career Discovery', href: '/discover', icon: Compass },
+    { label: 'Opportunities', href: '/opportunities', icon: Briefcase },
+    { label: 'Sessions', href: '/sessions', icon: CalendarDays },
   ],
   mentor: [
     { label: 'Sessions', href: '/mentor', icon: CalendarDays, exact: true },
@@ -45,6 +47,7 @@ const NAV: Record<SidebarVariant, NavItem[]> = {
   admin: [
     { label: 'Overview', href: '/admin', icon: BarChart3, exact: true },
     { label: 'Mentors', href: '/admin/mentors', icon: UserCheck },
+    { label: 'Opportunities', href: '/admin/opportunities', icon: Briefcase },
   ],
 };
 
@@ -54,11 +57,9 @@ const CONSOLE_LABEL: Record<SidebarVariant, string | null> = {
   admin: 'Admin',
 };
 
-/** In-page anchors (Opportunities) are never "the page". */
 function isActive(pathname: string, item: NavItem) {
-  if (item.href.includes('#')) return false;
   if (item.exact) return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  return [item.href, ...(item.also ?? [])].some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export default function Sidebar({ variant = 'student' }: { variant?: SidebarVariant }) {
@@ -91,8 +92,9 @@ export default function Sidebar({ variant = 'student' }: { variant?: SidebarVari
         </div>
 
         <nav className="mt-[26px] flex flex-col gap-0.5" aria-label="Dashboard">
-          {items.map(({ label, href, icon: Icon, exact }) => {
-            const active = isActive(pathname, { label, href, icon: Icon, exact });
+          {items.map((item) => {
+            const { label, href, icon: Icon } = item;
+            const active = isActive(pathname, item);
             return (
               <Link
                 key={label}
@@ -139,8 +141,9 @@ export default function Sidebar({ variant = 'student' }: { variant?: SidebarVari
         className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-line bg-white py-2 lg:hidden"
         aria-label="Dashboard mobile"
       >
-        {items.map(({ label, href, icon: Icon, exact }) => {
-          const active = isActive(pathname, { label, href, icon: Icon, exact });
+        {items.map((item) => {
+          const { label, href, icon: Icon } = item;
+          const active = isActive(pathname, item);
           return (
             <Link
               key={label}

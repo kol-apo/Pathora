@@ -1,5 +1,5 @@
 import type { DiscoveryProvider } from '../provider';
-import { createLlmProvider, type ChatMessage } from './llm';
+import { createLlmProvider, type ChatMessage, type CompleteFn } from './llm';
 
 /**
  * Adapter for any service exposing the OpenAI `/chat/completions` shape.
@@ -31,9 +31,19 @@ interface ChatCompletionResponse {
   error?: { message?: string };
 }
 
-export function createOpenAICompatibleProvider(
-  config: OpenAICompatibleConfig,
-): DiscoveryProvider {
+export function createOpenAICompatibleProvider(config: OpenAICompatibleConfig): DiscoveryProvider {
+  return createLlmProvider({
+    name: config.name ?? 'openai-compatible',
+    model: config.model,
+    complete: createOpenAICompatibleComplete(config),
+  });
+}
+
+/**
+ * The raw call: send messages, get the reply text. Used for discovery (JSON
+ * mode, validated) and for Pathy's chat (plain text).
+ */
+export function createOpenAICompatibleComplete(config: OpenAICompatibleConfig): CompleteFn {
   const {
     baseUrl,
     apiKey,
@@ -96,5 +106,5 @@ export function createOpenAICompatibleProvider(
     }
   };
 
-  return createLlmProvider({ name, model, complete });
+  return complete;
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createBooking, listBookingsForStudent } from '@/lib/db/queries';
+import { bookingStudyDetails, createBooking, listBookingsForStudent, logStudentEvent } from '@/lib/db/queries';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
 import { auth } from '@/auth';
 
@@ -27,6 +27,9 @@ const CreateSchema = z.object({
   mentorId: z.string().min(1),
   startsAt: z.coerce.date(),
   topic: z.string().trim().min(1).max(200),
+  /** Set when the student came from one of the three mentors on their result. */
+  discoveryResultId: z.string().min(1).optional(),
+  viaBridge: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -52,12 +55,19 @@ export async function POST(request: Request) {
   if ('error' in student) return student.error;
 
   try {
+    // createBooking checks the result belongs to this student and that the
+    // mentor was surfaced on it; the request alone proves nothing.
     const booking = await createBooking({
       studentId: student.id,
       mentorId: parsed.data.mentorId,
       startsAt: parsed.data.startsAt,
       topic: parsed.data.topic,
+      discoveryResultId: parsed.data.discoveryResultId,
+      viaBridge: parsed.data.viaBridge === true,
     });
+    // The booking is made; a research-log failure must not turn it into an error.
+    const details = await bookingStudyDetails(booking).catch(() => null);
+    if (details) await logStudentEvent(student.id, { type: 'booking_requested', payload: details });
     return NextResponse.json({ booking }, { status: 201 });
   } catch (err) {
     if (err instanceof DataError) {

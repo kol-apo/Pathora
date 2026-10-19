@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * The Pathora Guide: the character behind Career Discovery.
+ * Pathy, the Pathora guide: the character students speak with in Career Discovery.
  *
  * A navy blob that slowly changes shape, with white eyes that follow the
  * pointer and blink. Mood changes how it looks:
