@@ -18,6 +18,7 @@ export { default as BridgeRecommendation } from './BridgeRecommendation';
 export { default as VerifiedResource, RESOURCE_TYPES } from './VerifiedResource';
 export { default as AnalyticsEvent } from './AnalyticsEvent';
 export { default as VideoSession } from './VideoSession';
+export { default as PasswordReset } from './PasswordReset';
 
 export type { IUser, UserRole } from './User';
 export type { IStudentProfile } from './StudentProfile';

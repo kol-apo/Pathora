@@ -142,6 +142,18 @@ export async function upsertGoogleUser(profile: {
   return toIdentity(user);
 }
 
+/**
+ * What every request re-checks: the current role (it can change), and when
+ * the password last changed, which ends sessions signed in before it.
+ */
+export async function getSessionState(
+  userId: string,
+): Promise<{ role: UserRole; passwordChangedAt: Date | null } | null> {
+  await dbConnect();
+  const user = await User.findById(userId).select('role passwordChangedAt').lean();
+  return user ? { role: user.role, passwordChangedAt: user.passwordChangedAt ?? null } : null;
+}
+
 /** The current role for a user id. Roles can change (make-admin), so read it fresh. */
 export async function getRole(userId: string): Promise<UserRole | null> {
   await dbConnect();

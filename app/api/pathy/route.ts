@@ -89,7 +89,6 @@ export async function POST(request: Request) {
   ]);
 
   const ctx: PathyContext = {
-    firstName: (user.name ?? '').split(' ')[0],
     answers: latest.answers,
     match: latest.match,
     roadmapPath: `/discover/results/${latest.id}`,

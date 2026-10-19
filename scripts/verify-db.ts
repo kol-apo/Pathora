@@ -22,10 +22,15 @@ import {
   DiscoveryResult,
   MentorProfile,
   Opportunity,
+  PasswordReset,
   StudentProfile,
   User,
 } from '../lib/db/models';
 import { cancelBookingForStudent, createBooking } from '../lib/db/queries/bookings';
+import { requestPasswordReset, resetPassword } from '../lib/db/queries/passwords';
+import { deleteAccount } from '../lib/db/queries/accountDeletion';
+import { getSessionState, verifyCredentials } from '../lib/db/queries/accounts';
+import bcrypt from 'bcryptjs';
 import { previewBridge, saveDiscoveryResult } from '../lib/db/queries/discovery';
 import { generateDiscovery } from '../lib/ai/discovery';
 import { studentVectorFor } from '../lib/discovery/questions';
@@ -139,6 +144,8 @@ async function main() {
       await DiscoveryResult.deleteMany({ _id: savedResultId });
     }
     await StudentProfile.deleteMany({ user: { $in: studentIds } });
+    const runUsers = await User.find({ email: { $regex: RUN } }).select('_id').lean();
+    await PasswordReset.deleteMany({ user: { $in: runUsers.map((u) => u._id) } });
     await AnalyticsEvent.deleteMany({ participantCode: RUN });
     await Booking.deleteMany({ student: { $in: studentIds } });
     await Booking.deleteMany({ mentor: mentor._id });
@@ -554,6 +561,94 @@ async function main() {
     } catch (err) {
       ok('an outcome cannot be changed once recorded', err instanceof DataError && err.code === 'INVALID_TRANSITION');
     }
+
+    console.log('\n── Password reset ─────────────────────────────────────────');
+    const resetUser = await User.create({
+      name: `Reset Person ${RUN}`,
+      email: `reset.${RUN}@pathora.test`,
+      role: 'student',
+      passwordHash: await bcrypt.hash('oldpass123', 4),
+    });
+    const outbox: { to: string; text: string }[] = [];
+    const capture = async (e: { to: string; subject: string; text: string }) => {
+      outbox.push(e);
+      return { sent: true };
+    };
+    const linkIn = (text: string) => /token=([A-Za-z0-9_-]+)/.exec(text)?.[1] ?? '';
+
+    await requestPasswordReset(`nobody.${RUN}@pathora.test`, 'https://pathora.test', { send: capture });
+    ok('an unknown email gets no email (and the same answer)', outbox.length === 0);
+    await requestPasswordReset(`RESET.${RUN}@pathora.test`, 'https://pathora.test', { send: capture });
+    ok('a known email gets a link on the configured site', outbox.length === 1 && outbox[0].text.includes('https://pathora.test/reset-password?token='));
+    const token = linkIn(outbox[0].text);
+    const storedLink = await PasswordReset.findOne({ user: resetUser._id }).lean();
+    ok('only a hash of the token is stored', !!storedLink && storedLink.tokenHash !== token && !JSON.stringify(storedLink).includes(token));
+
+    await resetPassword(token, 'newpass456');
+    ok('the new password works', !!(await verifyCredentials(resetUser.email, 'newpass456')));
+    ok('the old one does not', !(await verifyCredentials(resetUser.email, 'oldpass123')));
+    const changed = await getSessionState(String(resetUser._id));
+    ok('the change is recorded, which ends older sessions', !!changed?.passwordChangedAt);
+    try {
+      await resetPassword(token, 'another789');
+      ok('a link works only once', false, 'it succeeded');
+    } catch (err) {
+      ok('a link works only once', err instanceof DataError && err.code === 'INVALID_RESET_LINK');
+    }
+    await requestPasswordReset(resetUser.email, 'https://pathora.test', { send: capture, now: new Date(Date.now() - 2 * 3_600_000) });
+    try {
+      await resetPassword(linkIn(outbox[outbox.length - 1].text), 'another789');
+      ok('an expired link is refused', false, 'it succeeded');
+    } catch (err) {
+      ok('an expired link is refused', err instanceof DataError && err.code === 'INVALID_RESET_LINK');
+    }
+    const rateUser = await User.create({ name: `Rate Person ${RUN}`, email: `rate.${RUN}@pathora.test`, role: 'student' });
+    const sentBefore = outbox.length;
+    for (let i = 0; i < 5; i++) await requestPasswordReset(rateUser.email, 'https://pathora.test', { send: capture });
+    ok('at most three links an hour', outbox.length - sentBefore === 3, `${outbox.length - sentBefore} sent`);
+
+    console.log('\n── Withdrawing and deleting an account ────────────────────');
+    const leaver = await User.create({
+      name: `Leaving Student ${RUN}`,
+      email: `leaver.${RUN}@pathora.test`,
+      role: 'student',
+      passwordHash: await bcrypt.hash('leave1234', 4),
+    });
+    const leaverCode = `L-${RUN}`;
+    await StudentProfile.create({ user: leaver._id, initials: 'LS', participantCode: leaverCode, consentVersion: 'verify', consentedAt: new Date() });
+    const leaverAnswers = { status: 1, interests: [1], environment: 0, strength: 1, vision: 2 };
+    const leaverResult = await saveDiscoveryResult(String(leaver._id), leaverAnswers, await generateDiscovery(leaverAnswers));
+    await logStudentEvent(String(leaver._id), { type: 'bridge_surfaced', payload: { sector: 'Technology' } });
+    const leaverSlot = (await listAvailableSlots(String(mentor._id)))[3];
+    await createBooking({ studentId: String(leaver._id), mentorId: String(mentor._id), startsAt: new Date(leaverSlot.startsAt), topic: 'Leaving soon' });
+
+    try {
+      await deleteAccount(String(leaver._id), 'wrong-password1');
+      ok('the wrong password deletes nothing', false, 'it succeeded');
+    } catch (err) {
+      ok('the wrong password deletes nothing', err instanceof DataError && err.code === 'WRONG_PASSWORD' && !!(await User.exists({ _id: leaver._id })));
+    }
+    try {
+      await deleteAccount(String(adminUser._id), null);
+      ok('an admin cannot delete themselves here', false, 'it succeeded');
+    } catch (err) {
+      ok('an admin cannot delete themselves here', err instanceof DataError && err.code === 'CANNOT_DELETE_ADMIN');
+    }
+
+    await deleteAccount(String(leaver._id), 'leave1234');
+    const left = {
+      user: await User.exists({ _id: leaver._id }),
+      profile: await StudentProfile.exists({ user: leaver._id }),
+      results: await DiscoveryResult.countDocuments({ student: leaver._id }),
+      recs: await BridgeRecommendation.countDocuments({ discoveryResult: leaverResult.id }),
+      bookings: await Booking.countDocuments({ student: leaver._id }),
+      events: await AnalyticsEvent.countDocuments({ participantCode: leaverCode }),
+    };
+    ok('the account and profile are gone', !left.user && !left.profile);
+    ok('the answers, result and its matched mentors are gone', left.results === 0 && left.recs === 0);
+    ok('the bookings are gone, freeing the slot', left.bookings === 0 && (await listAvailableSlots(String(mentor._id))).some((sl) => sl.startsAt === leaverSlot.startsAt));
+    ok('the research events under their code are gone', left.events === 0);
+    ok('their session ends on the next request', (await getSessionState(String(leaver._id))) === null);
 
     console.log('\n── Opportunities ──────────────────────────────────────────');
     const feedXml = `<rss><channel>

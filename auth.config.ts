@@ -21,6 +21,7 @@ const PROTECTED = [
   '/welcome',
   '/admin',
   '/mentor',
+  '/account',
 ];
 
 export const authConfig = {

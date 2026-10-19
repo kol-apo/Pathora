@@ -103,7 +103,7 @@ export default function ExplorePage() {
         </header>
 
         {/* Search, sort, and the sticky sector bar */}
-        <div className="sticky top-0 z-30 border-b border-line bg-white px-5 pb-5 pt-4 md:px-10">
+        <div className="sticky top-14 z-30 border-b border-line bg-white px-5 pb-5 pt-4 md:px-10 lg:top-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Input
               icon={<Search size={17} strokeWidth={1.5} />}

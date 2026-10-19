@@ -29,8 +29,8 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
 | Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. |
-| Data layer (MongoDB) | Built and tested: 11 collections, the bridge, access rules and research reports. `npm run verify` (271 checks) and `npm run verify:db` (56 checks) pass. |
-| Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. |
+| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (279 checks) and `npm run verify:db` (72 checks) pass. |
+| Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. "Forgot your password?" emails a link that works once, for an hour; resetting signs the account out everywhere. The Account page lets students withdraw from the study, which deletes the account and everything recorded about them, research events included. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
 | Admin console (`/admin`) | Built: platform counts and the research reports, and mentor review (approve with an interest profile, reject, suspend, reinstate). |
@@ -118,14 +118,16 @@ https://github.com/kol-apo/Pathora
 | `AI_PROVIDER` | No | `mock` (default, offline, no key) or `openai-compatible` |
 | `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Only for a live AI model | Any service that uses the OpenAI chat format, such as Groq, OpenRouter, Gemini or Ollama. Without one, Pathy cannot chat and says so |
 | `CRON_SECRET` | Only when deployed | Lets a scheduler call `/api/cron/opportunities` to read the opportunity feeds |
+| `RESEND_API_KEY`, `EMAIL_FROM` | For email | Resend sends password-reset emails. Without a key, emails are printed in the terminal during development. Until a domain is verified in Resend, it only delivers to your own Resend address |
+| `APP_URL` | When deployed | The site's address, used in emailed links (for example `https://pathora.vercel.app`). Never taken from the request, so a link cannot be pointed at another site |
 
 The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` it scores the answers offline, and the same offline scoring is the fallback if a live model fails.
 
 ### Checking that it works
 
 ```bash
-npm run verify      # 271 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
-npm run verify:db   # 56 live checks: double booking, the bridge, saving results, cancelling, session outcomes, access rules, research events, opportunities, reports
+npm run verify      # 279 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
+npm run verify:db   # 72 live checks: double booking, the bridge, saving results, cancelling, session outcomes, password resets, account deletion, access rules, research events, opportunities, reports
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
@@ -231,7 +233,7 @@ The full landing page is in [docs/screenshots/02-landing-full.png](docs/screensh
 
 ### Database (MongoDB)
 
-Eleven collections, defined as Mongoose models in `lib/db/models/`. Fields, validation rules, indexes and access rules are documented in [docs/data-model.md](docs/data-model.md).
+Twelve collections, defined as Mongoose models in `lib/db/models/`. Fields, validation rules, indexes and access rules are documented in [docs/data-model.md](docs/data-model.md).
 
 ```mermaid
 erDiagram

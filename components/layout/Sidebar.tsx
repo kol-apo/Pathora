@@ -69,7 +69,6 @@ export default function Sidebar({ variant = 'student' }: { variant?: SidebarVari
   const pathname = usePathname();
   // Nothing until the session loads: never show anyone else's details.
   const name = session?.user?.name ?? '';
-  const detail = session?.user?.email ?? '';
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -118,11 +117,18 @@ export default function Sidebar({ variant = 'student' }: { variant?: SidebarVari
             session ? 'opacity-100' : 'invisible opacity-0'
           }`}
         >
-          <Avatar initials={initials} size="xs" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[13px] font-medium text-ink">{name}</span>
-            <span className="truncate text-[11.5px] text-faint">{detail}</span>
-          </div>
+          <Link
+            href="/account"
+            aria-current={pathname === '/account' ? 'page' : undefined}
+            title="Account"
+            className="-m-1 flex min-w-0 flex-1 items-center gap-[11px] rounded p-1 transition-colors hover:bg-sky-soft/60"
+          >
+            <Avatar initials={initials} size="xs" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate text-[13px] font-medium text-ink">{name}</span>
+              <span className="truncate text-[11.5px] text-faint">Account</span>
+            </span>
+          </Link>
           {session && (
             <button
               onClick={() => signOut({ redirectTo: '/' })}
@@ -135,6 +141,25 @@ export default function Sidebar({ variant = 'student' }: { variant?: SidebarVari
           )}
         </div>
       </aside>
+
+      {/* Mobile top bar: the logo, and the way to the account page and to sign out */}
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-line bg-white px-5 lg:hidden">
+        <Wordmark size={24} href="/" />
+        {session && (
+          <div className="flex items-center gap-1">
+            <Link href="/account" aria-label="Account" className="rounded-full p-1 transition-colors hover:bg-sky-soft">
+              <Avatar initials={initials} size="xs" />
+            </Link>
+            <button
+              onClick={() => signOut({ redirectTo: '/' })}
+              aria-label="Sign out"
+              className="rounded p-2 text-faint transition-colors hover:bg-sky-soft hover:text-navy"
+            >
+              <LogOut size={17} strokeWidth={1.75} />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Mobile tab bar */}
       <nav

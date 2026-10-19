@@ -33,7 +33,10 @@ export type DataErrorCode =
   | 'INVALID_AVAILABILITY'
   | 'INVALID_APPLICATION'
   | 'INVALID_OPPORTUNITY'
-  | 'TOO_MANY_MESSAGES';
+  | 'TOO_MANY_MESSAGES'
+  | 'INVALID_RESET_LINK'
+  | 'WRONG_PASSWORD'
+  | 'CANNOT_DELETE_ADMIN';
 
 export class DataError extends Error {
   constructor(
@@ -84,6 +87,11 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   INVALID_OPPORTUNITY: 422,
   // Pathy's daily message allowance, which keeps the free AI quota for everyone.
   TOO_MANY_MESSAGES: 429,
+  // Expired, used or made up: the same answer for all three.
+  INVALID_RESET_LINK: 400,
+  WRONG_PASSWORD: 403,
+  // Admin accounts are removed by another admin, not by themselves.
+  CANNOT_DELETE_ADMIN: 403,
 };
 
 export function statusForError(err: unknown): number {

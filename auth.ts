@@ -3,7 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import Google from 'next-auth/providers/google';
 import { z } from 'zod';
 import { authConfig } from './auth.config';
-import { getRole, upsertGoogleUser, verifyCredentials } from '@/lib/db/queries/accounts';
+import { getSessionState, upsertGoogleUser, verifyCredentials } from '@/lib/db/queries/accounts';
 import { DataError } from '@/lib/db/queries/errors';
 import dbConnect from '@/lib/db/connect';
 import { User } from '@/lib/db/models';
@@ -73,14 +73,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (dbUser) {
           token.uid = String(dbUser._id);
           token.role = dbUser.role;
+          token.signedInAt = Date.now();
         }
       } else if (user?.id) {
         token.uid = user.id;
         token.role = user.role;
+        // When this sign-in happened. Not the token's own "iat", which is
+        // renewed whenever the session cookie is refreshed (middleware does
+        // that on every page), so it cannot say how old a sign-in is.
+        token.signedInAt = Date.now();
       } else if (token.uid) {
-        const role = await getRole(token.uid);
-        if (!role) return null; // the account was deleted: end the session
-        token.role = role;
+        const state = await getSessionState(token.uid);
+        if (!state) return null; // the account was deleted: end the session
+        // Signed in before the password was last reset: end the session.
+        if (
+          state.passwordChangedAt &&
+          (typeof token.signedInAt !== 'number' || token.signedInAt < state.passwordChangedAt.getTime())
+        ) {
+          return null;
+        }
+        token.role = state.role;
       }
       return token;
     },

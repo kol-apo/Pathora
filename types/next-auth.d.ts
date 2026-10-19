@@ -18,6 +18,8 @@ declare module 'next-auth' {
 declare module '@auth/core/jwt' {
   interface JWT {
     uid?: string;
+    /** Milliseconds since 1970 when this sign-in happened; compared with a password reset. */
+    signedInAt?: number;
     role?: UserRole;
   }
 }

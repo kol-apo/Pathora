@@ -247,7 +247,10 @@ export default function PathyChat({
           </button>
         </form>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[12px] text-faint">
-          <span>Chats stay on this device for 24 hours. Pathy can make mistakes; check details on the publisher&apos;s site.</span>
+          <span>
+            Pathy runs on Google&apos;s AI: don&apos;t share your name, contact details or other personal information. Chats
+            stay on this device for 24 hours. Pathy can make mistakes; check details on the publisher&apos;s site.
+          </span>
           <span className="flex gap-3">
             {turns.length > 0 && (
               <button type="button" onClick={clear} className="font-medium text-muted hover:text-ink">

@@ -6,7 +6,7 @@ This document is the readable version of that schema. Each rule below links to t
 
 ## Collections
 
-Eleven collections. The first seven run the application; the last four hold the research data.
+Twelve collections. Most run the application; `bridgerecommendations`, `verifiedresources`, `analyticsevents` and `videosessions` hold the research data.
 
 | Collection (model) | Holds |
 | --- | --- |
@@ -21,6 +21,7 @@ Eleven collections. The first seven run the application; the last four hold the 
 | `verifiedresources` (`VerifiedResource`) | The allow-list of real programmes the AI may name |
 | `analyticsevents` (`AnalyticsEvent`) | Research interaction events, under a pseudonymous code only |
 | `videosessions` (`VideoSession`) | Timing of each video call. No recordings |
+| `passwordresets` (`PasswordReset`) | Password-reset links: a hash of each token, never the token, removed by MongoDB an hour after it expires |
 
 ```mermaid
 erDiagram
@@ -163,6 +164,10 @@ Verified by `npm run verify:db`: owner, other student, surfaced-but-unbooked men
 **Roles.** Every account has one role: `student`, `mentor` or `admin`. Sign-up only ever creates students; mentors become mentors by applying, and admins are promoted with `npm run make-admin`, so nobody can choose a privileged role. The role is re-read from the database on every server request, so a change takes effect at once. API routes check it with `requireRole()` in [`lib/auth/guard.ts`](../lib/auth/guard.ts), and the `/admin` and `/mentor` page layouts check it before rendering. Verified by the browser tests: a student calling the admin or mentor API directly gets 403, and cannot open either console.
 
 **Research events.** `logStudentEvent()` in [`lib/db/queries/research.ts`](../lib/db/queries/research.ts) looks the participant code up from the signed-in student's profile, never from the request, so nobody can write events under another participant's code. Students who have not consented have no code and are not recorded. Payloads hold no ids at all, not even record ids, since a result or booking id leads back to a user. The events are `discovery_completed`, `bridge_surfaced`, `bridge_profile_viewed` (with the mentor's rank), `booking_requested` (with whether it came through the bridge, and the rank) `booking_cancelled` (with how many hours before the start), `session_outcome` (held or not, recorded under the student's code when their mentor reports it), and `pathy_message` (the prompt version and model, and whether the fallback reply was used; never the text). Pathy's daily allowance is counted from these events.
+
+**Withdrawal.** `deleteAccount()` in [`lib/db/queries/accountDeletion.ts`](../lib/db/queries/accountDeletion.ts) removes the account and everything linked to it: the student profile, discovery results and their bridge records, bookings and video sessions, password-reset links, and every analytics event under the participant code. For a mentor, it also removes their profile, hours, the sessions booked with them and their place in students' matches. Accounts with a password must confirm it; admin accounts cannot delete themselves. Nothing is kept "anonymised": the consent form promises withdrawal.
+
+**Password resets.** A reset link carries a random token; only its SHA-256 hash is stored. It works once, for an hour, at most three per account per hour, and asking for one never reveals whether an email has an account. A reset records `User.passwordChangedAt`, and every session signed in before it is ended on its next request.
 
 **Who is stored.** Only consented students' discovery results are saved; everything except the landing page needs sign-in and consent. Conversations with Pathy are not stored on the server at all: the student's browser keeps them for 24 hours and sends the recent turns with each message.
 

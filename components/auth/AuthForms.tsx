@@ -189,7 +189,12 @@ export function SignInForm({
           onChange={(e) => setEmail(e.target.value)}
         />
         <PasswordField label="Password" value={password} onChange={setPassword} autoComplete="current-password" />
-        <div className="pt-2">
+        <p className="text-right text-[13px]">
+          <Link href="/forgot-password" className="font-medium text-muted underline-offset-2 hover:text-navy hover:underline">
+            Forgot your password?
+          </Link>
+        </p>
+        <div className="pt-1">
           <SubmitButton busy={busy}>Sign in</SubmitButton>
         </div>
       </form>
@@ -281,6 +286,116 @@ export function SignUpForm({ googleEnabled, next }: { googleEnabled: boolean; ne
         />
         <div className="pt-2">
           <SubmitButton busy={busy}>Create account</SubmitButton>
+        </div>
+      </form>
+    </>
+  );
+}
+
+/** Ask for a reset link. The answer is the same whether or not the email has an account. */
+export function ForgotPasswordForm() {
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await fetch('/api/password/forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => null);
+    setBusy(false);
+    if (!res?.ok) {
+      setError((await res?.json().catch(() => null))?.error ?? 'Something went wrong. Please try again.');
+      return;
+    }
+    setSent(true);
+  };
+
+  if (sent) {
+    return (
+      <div role="status" className="rounded-lg border border-sky-muted bg-sky-soft p-5 text-[14.5px] leading-relaxed text-ink">
+        <p className="font-medium">Check your email.</p>
+        <p className="mt-1.5 text-muted">
+          If {email} has a Pathora account, we have sent it a link to choose a new password. The link works for one hour.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {error && <ErrorBox message={error} />}
+      <form onSubmit={submit} className="space-y-4">
+        <Field
+          label="Email"
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <div className="pt-2">
+          <SubmitButton busy={busy}>Send reset link</SubmitButton>
+        </div>
+      </form>
+    </>
+  );
+}
+
+/** Choose a new password from an emailed link. */
+export function ResetPasswordForm({ token, hint }: { token: string; hint: string }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirm) {
+      setError('The two passwords do not match.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const res = await fetch('/api/password/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    }).catch(() => null);
+    setBusy(false);
+    if (!res?.ok) {
+      setError((await res?.json().catch(() => null))?.error ?? 'Something went wrong. Please try again.');
+      return;
+    }
+    setDone(true);
+  };
+
+  if (done) {
+    return (
+      <div role="status" className="rounded-lg border border-sky-muted bg-sky-soft p-5 text-[14.5px] leading-relaxed text-ink">
+        <p className="font-medium">Your password has been changed.</p>
+        <p className="mt-1.5 text-muted">Anywhere you were signed in before has been signed out.</p>
+        <Link href="/signin" className="mt-4 inline-block font-medium text-navy underline underline-offset-2">
+          Sign in with your new password
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {error && <ErrorBox message={error} />}
+      <form onSubmit={submit} className="space-y-4">
+        <PasswordField label="New password" hint={hint} value={password} onChange={setPassword} autoComplete="new-password" />
+        <PasswordField label="Type it again" value={confirm} onChange={setConfirm} autoComplete="new-password" />
+        <div className="pt-2">
+          <SubmitButton busy={busy}>Change password</SubmitButton>
         </div>
       </form>
     </>

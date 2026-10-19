@@ -218,7 +218,7 @@ export default function DiscoveryChat({
   return (
     <div className="flex min-h-[calc(100vh-68px)] flex-col">
       {/* Progress */}
-      <div className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
+      <div className="sticky top-14 z-10 border-b border-line bg-white/90 backdrop-blur lg:top-0">
         <div className="mx-auto flex max-w-[720px] items-center gap-4 px-5 py-3 md:px-6">
           <div className="flex-1">
             <ProgressBar currentStep={Math.min(step + (done ? 0 : 1), TOTAL_STEPS)} totalSteps={TOTAL_STEPS} />

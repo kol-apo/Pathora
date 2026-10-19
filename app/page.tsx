@@ -30,7 +30,7 @@ async function approvedMentors(): Promise<Consultant[]> {
  * students and for mentors. Signed-in users never see it; they go straight
  * to their own home.
  */
-export default async function LandingPage() {
+export default async function LandingPage({ searchParams }: { searchParams: { deleted?: string } }) {
   const session = await auth();
   if (session?.user) redirect(homeFor(session.user.role));
 
@@ -39,6 +39,11 @@ export default async function LandingPage() {
   return (
     <>
       <Navbar />
+      {searchParams.deleted === '1' && (
+        <p role="status" className="border-b border-sky-muted bg-sky-soft px-5 py-3 text-center text-[14px] text-navy">
+          Your account and all your data have been deleted. Thank you for taking part.
+        </p>
+      )}
       <main className="mx-auto max-w-[1440px]">
         {/* ── Hero ─────────────────────────────────────────────── */}
         <section className="grid items-center gap-12 px-5 py-16 md:px-10 lg:grid-cols-2 lg:py-24">

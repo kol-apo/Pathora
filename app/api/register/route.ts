@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { registerStudent } from '@/lib/db/queries/accounts';
+import { PasswordSchema } from '@/lib/auth/password';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
 
 export const dynamic = 'force-dynamic';
@@ -12,11 +13,7 @@ export const dynamic = 'force-dynamic';
 const RegisterSchema = z.object({
   name: z.string().trim().min(2, 'Enter your full name.').max(80),
   email: z.string().trim().email('Enter a valid email address.').max(200),
-  password: z
-    .string()
-    .min(8, 'Use at least 8 characters.')
-    .max(200)
-    .refine((p) => /[A-Za-z]/.test(p) && /\d/.test(p), 'Use at least one letter and one number.'),
+  password: PasswordSchema,
 });
 
 export async function POST(request: Request) {

@@ -13,6 +13,8 @@ export interface IUser {
   passwordHash?: string;
   /** Google account id ("sub"), set when the user signs in with Google. */
   googleId?: string;
+  /** When the password last changed. Sessions signed before this are ended. */
+  passwordChangedAt?: Date;
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
@@ -39,6 +41,7 @@ const UserSchema = new Schema<IUser>(
     image: { type: String },
     passwordHash: { type: String, select: false },
     googleId: { type: String, unique: true, sparse: true },
+    passwordChangedAt: { type: Date },
     role: {
       type: String,
       enum: ['student', 'mentor', 'admin'],
