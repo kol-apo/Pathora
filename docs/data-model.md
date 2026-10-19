@@ -162,7 +162,7 @@ Verified by `npm run verify:db`: owner, other student, surfaced-but-unbooked men
 
 **Roles.** Every account has one role: `student`, `mentor` or `admin`. Sign-up only ever creates students; mentors become mentors by applying, and admins are promoted with `npm run make-admin`, so nobody can choose a privileged role. The role is re-read from the database on every server request, so a change takes effect at once. API routes check it with `requireRole()` in [`lib/auth/guard.ts`](../lib/auth/guard.ts), and the `/admin` and `/mentor` page layouts check it before rendering. Verified by the browser tests: a student calling the admin or mentor API directly gets 403, and cannot open either console.
 
-**Research events.** `logStudentEvent()` in [`lib/db/queries/research.ts`](../lib/db/queries/research.ts) looks the participant code up from the signed-in student's profile, never from the request, so nobody can write events under another participant's code. Students who have not consented have no code and are not recorded. Payloads hold no ids at all, not even record ids, since a result or booking id leads back to a user. The events are `discovery_completed`, `bridge_surfaced`, `bridge_profile_viewed` (with the mentor's rank), `booking_requested` (with whether it came through the bridge, and the rank) `booking_cancelled` (with how many hours before the start), and `pathy_message` (the prompt version and model, and whether the fallback reply was used; never the text). Pathy's daily allowance is counted from these events.
+**Research events.** `logStudentEvent()` in [`lib/db/queries/research.ts`](../lib/db/queries/research.ts) looks the participant code up from the signed-in student's profile, never from the request, so nobody can write events under another participant's code. Students who have not consented have no code and are not recorded. Payloads hold no ids at all, not even record ids, since a result or booking id leads back to a user. The events are `discovery_completed`, `bridge_surfaced`, `bridge_profile_viewed` (with the mentor's rank), `booking_requested` (with whether it came through the bridge, and the rank) `booking_cancelled` (with how many hours before the start), `session_outcome` (held or not, recorded under the student's code when their mentor reports it), and `pathy_message` (the prompt version and model, and whether the fallback reply was used; never the text). Pathy's daily allowance is counted from these events.
 
 **Who is stored.** Only consented students' discovery results are saved; everything except the landing page needs sign-in and consent. Conversations with Pathy are not stored on the server at all: the student's browser keeps them for 24 hours and sends the recent turns with each message.
 
@@ -174,7 +174,7 @@ Verified by `npm run verify:db`: owner, other student, surfaced-but-unbooked men
 | --- | --- |
 | `bridgeFunnel()` | Per sector: discovery results generated, viewed and booked through the bridge, and the conversion rate. The study's primary dependent variable |
 | `schemaValidation()` | Per prompt version: share of outputs that met their contract, first time and overall, and mean retries |
-| `sessionCompletion()` | Share of video sessions that ended, and their median length |
+| `sessionCompletion()` | Whether booked sessions take place: held and missed sessions as mentors report them (and how many came through the bridge), plus video sessions ended and their median length once live video exists |
 
 ## ERD names and collections
 

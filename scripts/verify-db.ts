@@ -32,7 +32,8 @@ import { studentVectorFor } from '../lib/discovery/questions';
 import { listAvailableSlots } from '../lib/db/queries/mentors';
 import { bridgeEligible, surfaceBridgeConsultants } from '../lib/db/queries/bridge';
 import { getDiscoveryResultForMentor, getDiscoveryResultForStudent } from '../lib/db/queries/access';
-import { bridgeFunnel, countStudentEvents, logEvent, logStudentEvent } from '../lib/db/queries/research';
+import { bridgeFunnel, countStudentEvents, logEvent, logStudentEvent, sessionCompletion } from '../lib/db/queries/research';
+import { listMyPastSessions, respondToBooking } from '../lib/db/queries/mentorConsole';
 import { addOpportunity, hideOpportunity, listOpportunities, refreshOpportunities } from '../lib/db/queries/opportunities';
 import { BRIDGE_SIZE, rankCandidates } from '../lib/matching/similarity';
 import { SECTORS } from '../lib/types';
@@ -504,6 +505,56 @@ async function main() {
         saved.bridge.status === 'ready' &&
         JSON.stringify(preview.mentors.map((m) => m.id)) === JSON.stringify(saved.bridge.mentors.map((m) => m.id)),
     );
+    console.log('\n── Session outcomes ───────────────────────────────────────');
+    // A confirmed session that started an hour ago, and one next week.
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    const [held, future] = await Booking.create([
+      {
+        student: students[2]._id,
+        mentor: mentor._id,
+        topic: 'Outcome test',
+        startsAt: hourAgo,
+        endsAt: new Date(hourAgo.getTime() + 45 * 60_000),
+        status: 'confirmed',
+      },
+      {
+        student: students[2]._id,
+        mentor: mentor._id,
+        topic: 'Outcome test, future',
+        startsAt: new Date(Date.now() + 7 * 86_400_000),
+        endsAt: new Date(Date.now() + 7 * 86_400_000 + 45 * 60_000),
+        status: 'confirmed',
+      },
+    ]);
+    const pastForMentor = await listMyPastSessions(String(mentorUser._id));
+    ok("a started, confirmed session waits for the mentor's outcome", pastForMentor.awaiting.some((b) => b.id === String(held._id)));
+    try {
+      await respondToBooking(String(mentorUser._id), String(future._id), 'complete');
+      ok('a session that has not started cannot be marked as held', false, 'it succeeded');
+    } catch (err) {
+      ok('a session that has not started cannot be marked as held', err instanceof DataError && err.code === 'SESSION_NOT_STARTED');
+    }
+    try {
+      await respondToBooking(String(adminUser._id), String(held._id), 'complete');
+      ok("someone else cannot record another mentor's session", false, 'it succeeded');
+    } catch (err) {
+      ok("someone else cannot record another mentor's session", err instanceof DataError && err.code === 'BOOKING_NOT_FOUND');
+    }
+    const sessionsBefore = (await MentorProfile.findById(mentor._id).lean())!.sessionCount;
+    const reportBefore = await sessionCompletion();
+    await respondToBooking(String(mentorUser._id), String(held._id), 'complete');
+    const heldAfter = await Booking.findById(held._id).lean();
+    ok('the mentor marks it completed', heldAfter?.status === 'completed');
+    ok("and the mentor's session count goes up", (await MentorProfile.findById(mentor._id).lean())!.sessionCount === sessionsBefore + 1);
+    const reportAfter = await sessionCompletion();
+    ok('the completion report counts it as held', reportAfter.reported.held === reportBefore.reported.held + 1);
+    try {
+      await respondToBooking(String(mentorUser._id), String(held._id), 'no_show');
+      ok('an outcome cannot be changed once recorded', false, 'it succeeded');
+    } catch (err) {
+      ok('an outcome cannot be changed once recorded', err instanceof DataError && err.code === 'INVALID_TRANSITION');
+    }
+
     console.log('\n── Opportunities ──────────────────────────────────────────');
     const feedXml = `<rss><channel>
       <item><title>Open Fellowship ${RUN}</title><link>https://example.org/${RUN}/open</link>

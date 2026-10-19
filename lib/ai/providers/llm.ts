@@ -1,7 +1,7 @@
 import type { DiscoveryAnswers } from '@/lib/discovery/questions';
 import { buildRepairPrompt, buildUserPrompt, SYSTEM_PROMPT } from '../prompt';
 import { parseCareerMatch, type CareerMatch } from '../schema';
-import type { DiscoveryProvider } from '../provider';
+import type { DiscoveryProvider, Generated } from '../provider';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -43,7 +43,7 @@ export function createLlmProvider(config: LlmProviderConfig): DiscoveryProvider 
     name: config.name,
     model: config.model,
 
-    async generate(answers: DiscoveryAnswers, signal: AbortSignal): Promise<CareerMatch> {
+    async generate(answers: DiscoveryAnswers, signal: AbortSignal): Promise<Generated> {
       const messages: ChatMessage[] = [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: buildUserPrompt(answers) },
@@ -55,7 +55,9 @@ export function createLlmProvider(config: LlmProviderConfig): DiscoveryProvider 
         const text = await config.complete(messages, signal);
         const parsed = parseCareerMatch(text);
 
-        if (parsed.ok) return parsed.value;
+        // Retries are recorded with the result: the research measures how
+        // often each prompt version meets its contract first time.
+        if (parsed.ok) return { result: parsed.value, retryCount: attempt - 1 };
 
         failures.push(`attempt ${attempt}: ${parsed.error}`);
 

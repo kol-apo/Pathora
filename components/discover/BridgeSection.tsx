@@ -27,7 +27,7 @@ export default function BridgeSection({
   const browseHref = `/explore?sector=${encodeURIComponent(sector)}`;
 
   return (
-    <section aria-label="Talk to a consultant" className="border-t border-line pt-10">
+    <section aria-label="Talk to a mentor" className="border-t border-line pt-10">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-[26px] font-bold tracking-[-0.03em] text-ink md:text-[30px]">
@@ -43,7 +43,7 @@ export default function BridgeSection({
           href={browseHref}
           className="shrink-0 text-sm font-medium text-ink underline-offset-4 hover:underline"
         >
-          See all {sector} consultants →
+          See all {sector} mentors →
         </Link>
       </div>
 
@@ -77,7 +77,7 @@ export default function BridgeSection({
             href={browseHref}
             className="mt-5 inline-block rounded bg-navy px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-deep"
           >
-            Browse {sector} consultants
+            Browse {sector} mentors
           </Link>
         </div>
       )}

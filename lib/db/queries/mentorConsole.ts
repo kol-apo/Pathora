@@ -192,30 +192,98 @@ export async function listMyBookings(userId: string, now = new Date()): Promise<
     .sort({ startsAt: 1 })
     .populate('student', 'name')
     .lean();
-  return docs.map((b) => ({
+  return docs.map(toMentorBooking);
+}
+
+/** Students appear by first name only. */
+function toMentorBooking(b: {
+  _id: unknown;
+  student: unknown;
+  topic: string;
+  startsAt: Date;
+  endsAt: Date;
+  status: BookingStatus;
+  viaBridge?: boolean;
+}): MentorBookingDTO {
+  return {
     id: String(b._id),
-    studentName: ((b.student as unknown as { name?: string })?.name ?? 'A student').split(' ')[0],
+    studentName: ((b.student as { name?: string } | null)?.name ?? 'A student').split(' ')[0],
     topic: b.topic,
     startsAt: new Date(b.startsAt).toISOString(),
     endsAt: new Date(b.endsAt).toISOString(),
     status: b.status,
     viaBridge: !!b.viaBridge,
-  }));
+  };
 }
 
-/** Confirm or decline one of the mentor's own booking requests. */
+export type MentorBookingAction = 'confirm' | 'decline' | 'complete' | 'no_show';
+
+const NEXT_STATUS: Record<MentorBookingAction, BookingStatus> = {
+  confirm: 'confirmed',
+  decline: 'cancelled',
+  complete: 'completed',
+  no_show: 'no_show',
+};
+
+/**
+ * A mentor acts on one of their own bookings: confirm or decline a request,
+ * or, once a confirmed session's start time has passed, record whether it
+ * took place. Returns what the research log needs (no ids leave the server).
+ */
 export async function respondToBooking(
   userId: string,
   bookingId: string,
-  action: 'confirm' | 'decline',
-): Promise<void> {
+  action: MentorBookingAction,
+  now = new Date(),
+): Promise<{ studentId: string; sector: Sector; viaBridge: boolean }> {
   if (!isValidObjectId(bookingId)) throw new DataError('INVALID_ID', 'Malformed booking id.');
   await dbConnect();
-  const m = await MentorProfile.findOne({ user: userId }).select('_id').lean();
+  const m = await MentorProfile.findOne({ user: userId }).select('_id sector').lean();
   // "Not found" for someone else's booking too, so ids cannot be probed.
-  const booking = m ? await Booking.findOne({ _id: bookingId, mentor: m._id }).select('_id').lean() : null;
+  const booking = m
+    ? await Booking.findOne({ _id: bookingId, mentor: m._id }).select('student status startsAt viaBridge').lean()
+    : null;
   if (!booking) throw new DataError('BOOKING_NOT_FOUND', 'No such booking.');
-  await setBookingStatus(bookingId, action === 'confirm' ? 'confirmed' : 'cancelled', userId);
+
+  if (action === 'complete' || action === 'no_show') {
+    if (booking.status !== 'confirmed') {
+      throw new DataError('INVALID_TRANSITION', 'Only a confirmed session can be marked as held or missed.');
+    }
+    if (new Date(booking.startsAt) > now) {
+      throw new DataError('SESSION_NOT_STARTED', 'You can record this once the session has started.');
+    }
+  }
+
+  await setBookingStatus(bookingId, NEXT_STATUS[action], userId);
+  if (action === 'complete') {
+    await MentorProfile.updateOne({ _id: m!._id }, { $inc: { sessionCount: 1 } });
+  }
+  return { studentId: String(booking.student), sector: m!.sector, viaBridge: !!booking.viaBridge };
+}
+
+/**
+ * The mentor's past sessions: confirmed ones that have started and still need
+ * an outcome, and the most recent ones already settled.
+ */
+export async function listMyPastSessions(
+  userId: string,
+  now = new Date(),
+): Promise<{ awaiting: MentorBookingDTO[]; recent: MentorBookingDTO[] }> {
+  await dbConnect();
+  const m = await MentorProfile.findOne({ user: userId }).select('_id').lean();
+  if (!m) return { awaiting: [], recent: [] };
+  const [awaiting, recent] = await Promise.all([
+    Booking.find({ mentor: m._id, status: 'confirmed', startsAt: { $lte: now } })
+      .sort({ startsAt: 1 })
+      .populate('student', 'name')
+      .lean(),
+    Booking.find({ mentor: m._id, status: { $in: ['completed', 'no_show'] } })
+      .sort({ startsAt: -1 })
+      .limit(10)
+      .populate('student', 'name')
+      .lean(),
+  ]);
+  return { awaiting: awaiting.map(toMentorBooking), recent: recent.map(toMentorBooking) };
 }
 
 /** The mentor's own public links, for the profile page in their console. */

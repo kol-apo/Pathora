@@ -118,21 +118,33 @@ export default async function AdminOverviewPage() {
                 <li key={v.promptVersion} className="text-sm">
                   <p className="font-medium text-ink">{v.promptVersion}</p>
                   <p className="text-muted">
-                    {v.results} results · {v.validityPct}% valid · {v.firstAttemptPct}% first time
+                    {v.results} result{v.results === 1 ? '' : 's'} · {v.validityPct}% valid · {v.firstAttemptPct}% first time
                   </p>
                 </li>
               ))}
             </ul>
           )}
         </Panel>
-        <Panel title="Session completion" note="Whether booked video sessions take place.">
-          {sessions.sessions === 0 ? (
-            <Empty>No video sessions yet. They start once live video is added.</Empty>
+        <Panel title="Session completion" note="Whether booked sessions take place, as mentors report them.">
+          {sessions.reported.held + sessions.reported.missed + sessions.reported.awaiting === 0 ? (
+            <Empty>No sessions have reached their time yet.</Empty>
           ) : (
-            <p className="text-sm text-ink">
-              {sessions.sessionsEnded} of {sessions.sessions} ended ({sessions.completionPct}%), median{' '}
-              {Math.round((sessions.medianDurationSeconds ?? 0) / 60)} minutes.
-            </p>
+            <div className="flex flex-col gap-1.5 text-sm text-ink">
+              <p>
+                {sessions.reported.held} held · {sessions.reported.missed} did not take place
+                {sessions.reported.heldPct !== null ? ` (${sessions.reported.heldPct}% held)` : ''}
+              </p>
+              <p className="text-muted">
+                {sessions.reported.heldViaBridge} of the held sessions came through the bridge.{' '}
+                {sessions.reported.awaiting > 0 && `${sessions.reported.awaiting} still waiting for the mentor to say.`}
+              </p>
+              {sessions.sessions > 0 && (
+                <p className="text-muted">
+                  Video: {sessions.sessionsEnded} of {sessions.sessions} ended, median{' '}
+                  {Math.round((sessions.medianDurationSeconds ?? 0) / 60)} minutes.
+                </p>
+              )}
+            </div>
           )}
         </Panel>
       </div>

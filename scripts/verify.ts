@@ -650,8 +650,15 @@ async function discoveryTests() {
     },
   });
   const recovered = await flaky.generate(ANSWERS, signal);
-  ok('retry recovers from one bad response', !!recovered.primary.title);
+  ok('retry recovers from one bad response', !!recovered.result.primary.title);
   eq('retry used exactly two attempts', calls, 2);
+  eq('and reports one retry', recovered.retryCount, 1);
+
+  calls = 0;
+  const retried = await generateDiscovery(ANSWERS, { provider: flaky });
+  eq('the retry count reaches the outcome', retried.retryCount, 1);
+  eq('and is stored on the result', toDiscoveryResultDoc(ANSWERS, retried).retryCount, 1);
+  ok('a result that needed a retry is still schema-valid', toDiscoveryResultDoc(ANSWERS, retried).schemaValid === true);
 
   // A model that never complies must give up rather than loop.
   const broken = createLlmProvider({
@@ -660,6 +667,11 @@ async function discoveryTests() {
     complete: async () => 'nope',
   });
   await rejects('a permanently bad model throws', () => broken.generate(ANSWERS, signal));
+  const gaveUp = await generateDiscovery(ANSWERS, { provider: broken });
+  ok(
+    'when the model never complies, the fallback records the retries it used and is not schema-valid',
+    gaveUp.usedFallback && gaveUp.retryCount === 1 && toDiscoveryResultDoc(ANSWERS, gaveUp).schemaValid === false,
+  );
 
   // Orchestration must never fail the student.
   const down = {

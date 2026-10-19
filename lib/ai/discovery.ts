@@ -1,5 +1,6 @@
 import { studentVectorFor, type DiscoveryAnswers } from '@/lib/discovery/questions';
 import { generateMockMatch } from './providers/mock';
+import { ModelOutputError } from './providers/llm';
 import { PROMPT_VERSION } from './prompt';
 import { resolveProvider, type DiscoveryProvider, type ProviderEnv } from './provider';
 import type { CareerMatch } from './schema';
@@ -12,6 +13,11 @@ export interface DiscoveryOutcome {
   latencyMs: number;
   /** True when the configured provider failed and the offline result was used. */
   usedFallback: boolean;
+  /**
+   * How many times the model was asked again after an invalid answer. With a
+   * fallback, the retries the model used before Pathora gave up on it.
+   */
+  retryCount: number;
   /** Why the fallback kicked in. Log it; never show it to a student. */
   fallbackReason?: string;
 }
@@ -53,13 +59,14 @@ export async function generateDiscovery(
   }
 
   try {
-    const result = await provider.generate(answers, signal);
+    const { result, retryCount } = await provider.generate(answers, signal);
     return {
       result,
       provider: provider.name,
       model: provider.model,
       latencyMs: Date.now() - started,
       usedFallback: false,
+      retryCount,
     };
   } catch (err) {
     if (options.throwOnFailure) throw err;
@@ -67,6 +74,8 @@ export async function generateDiscovery(
       answers,
       started,
       `${provider.name}/${provider.model}: ${(err as Error).message}`,
+      // Every attempt returned something invalid: all but the first were retries.
+      err instanceof ModelOutputError ? Math.max(0, err.attempts.length - 1) : 0,
     );
   }
 }
@@ -75,6 +84,7 @@ function offline(
   answers: DiscoveryAnswers,
   started: number,
   reason: string,
+  retryCount = 0,
 ): DiscoveryOutcome {
   return {
     result: generateMockMatch(answers),
@@ -83,6 +93,7 @@ function offline(
     latencyMs: Date.now() - started,
     usedFallback: true,
     fallbackReason: reason,
+    retryCount,
   };
 }
 
@@ -113,9 +124,7 @@ export function toDiscoveryResultDoc(
     promptVersion: PROMPT_VERSION,
     // The offline fallback is a valid result, but it was not the model's output.
     schemaValid: !outcome.usedFallback,
-    // Not yet reported by the provider, which retries internally (see
-    // providers/llm.ts). Recorded as 0 until the provider exposes its count.
-    retryCount: 0,
+    retryCount: outcome.retryCount,
     // Calculated from the answers, not by the model, so the bridge ranking can
     // be reproduced from the stored answers without calling a model again.
     studentVector: studentVectorFor(answers),

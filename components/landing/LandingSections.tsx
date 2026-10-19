@@ -285,6 +285,7 @@ export function Sectors({ consultants }: { consultants: Consultant[] }) {
                         alt=""
                         width={36}
                         height={36}
+                        unoptimized
                         className="h-9 w-9 rounded-full object-cover object-[50%_22%] ring-[3px] ring-white"
                       />
                     ) : (

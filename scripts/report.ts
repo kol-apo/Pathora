@@ -42,10 +42,15 @@ async function main() {
 
   console.log('\nSession completion');
   const s = await sessionCompletion();
+  const r = s.reported;
+  console.log(
+    `  reported by mentors: ${r.held} held, ${r.missed} did not take place` +
+      `${r.heldPct !== null ? ` (${r.heldPct}% held)` : ''}, ${r.awaiting} awaiting an outcome; ${r.heldViaBridge} held via the bridge`,
+  );
   console.log(
     s.sessions === 0
-      ? '  no video sessions yet'
-      : `  ${s.sessionsEnded} of ${s.sessions} sessions ended (${s.completionPct}%), median ${s.medianDurationSeconds ?? '-'} seconds`,
+      ? '  video: no video sessions yet'
+      : `  video: ${s.sessionsEnded} of ${s.sessions} sessions ended (${s.completionPct}%), median ${s.medianDurationSeconds ?? '-'} seconds`,
   );
 
   await mongoose.disconnect();

@@ -1,5 +1,5 @@
 import dbConnect from '../connect';
-import { AnalyticsEvent, BridgeRecommendation, DiscoveryResult, StudentProfile, VideoSession } from '../models';
+import { AnalyticsEvent, Booking, BridgeRecommendation, DiscoveryResult, StudentProfile, VideoSession } from '../models';
 import type { Sector } from '@/lib/types';
 
 /**
@@ -114,10 +114,22 @@ export async function schemaValidation(): Promise<ValidityRow[]> {
 }
 
 export interface CompletionRow {
+  /** Video sessions (from the video provider, once live video exists). */
   sessions: number;
   sessionsEnded: number;
   completionPct: number | null;
   medianDurationSeconds: number | null;
+  /** Confirmed bookings whose time has come, as their mentors report them. */
+  reported: {
+    held: number;
+    missed: number;
+    /** Started, but the mentor has not said yet. */
+    awaiting: number;
+    /** Held as a share of those with an outcome. */
+    heldPct: number | null;
+    /** Of the held sessions, how many came through the bridge. */
+    heldViaBridge: number;
+  };
 }
 
 /** Whether booked sessions actually happen, and how long they run. */
@@ -140,11 +152,25 @@ export async function sessionCompletion(): Promise<CompletionRow> {
         ? durations[mid]
         : (durations[mid - 1] + durations[mid]) / 2;
 
+  const [held, missed, awaiting, heldViaBridge] = await Promise.all([
+    Booking.countDocuments({ status: 'completed' }),
+    Booking.countDocuments({ status: 'no_show' }),
+    Booking.countDocuments({ status: 'confirmed', startsAt: { $lte: new Date() } }),
+    Booking.countDocuments({ status: 'completed', viaBridge: true }),
+  ]);
+
   return {
     sessions,
     sessionsEnded,
     completionPct: sessions ? Math.round((sessionsEnded / sessions) * 10000) / 100 : null,
     medianDurationSeconds: median,
+    reported: {
+      held,
+      missed,
+      awaiting,
+      heldPct: held + missed ? Math.round((held / (held + missed)) * 10000) / 100 : null,
+      heldViaBridge,
+    },
   };
 }
 
@@ -172,6 +198,8 @@ export type StudyEvent =
   | { type: 'bridge_profile_viewed'; payload: { sector: Sector; rank: number } }
   | { type: 'booking_requested'; payload: { sector: Sector; viaBridge: boolean; rank: number | null } }
   | { type: 'booking_cancelled'; payload: { sector: Sector; viaBridge: boolean; hoursBeforeStart: number } }
+  // Recorded under the student's code when their mentor reports how the session went.
+  | { type: 'session_outcome'; payload: { sector: Sector; viaBridge: boolean; outcome: 'completed' | 'no_show' } }
   // Never the message text: only that a message was sent, and how it was answered.
   | { type: 'pathy_message'; payload: { sector: Sector; promptVersion: string; model: string; usedFallback: boolean } };
 

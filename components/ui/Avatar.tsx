@@ -44,6 +44,9 @@ export default function Avatar({
         aria-hidden="true"
         width={sizePx[size]}
         height={sizePx[size]}
+        // Photos are stored small already (see public/mentors), so they are
+        // served as they are rather than through the image resizer.
+        unoptimized
         // Headshots are portrait: keep the face in the square, not the shoulders.
         className={`shrink-0 object-cover object-[50%_22%] ${sizeClasses[size]} ${toneClasses[tone]} ${className}`}
       />

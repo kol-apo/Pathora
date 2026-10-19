@@ -5,7 +5,7 @@ import { Wordmark } from './Navbar';
 
 const links = [
   { label: 'About', href: '/#about' },
-  { label: 'For consultants', href: '/become-a-mentor' },
+  { label: 'For mentors', href: '/become-a-mentor' },
   { label: 'Opportunities', href: '/dashboard#opportunities' },
   { label: 'Contact', href: '#' },
 ];
@@ -23,7 +23,7 @@ export default function Footer() {
               <span>In partnership with</span>
               {partners.map((p) => (
                 <span key={p.name} className="inline-flex items-center gap-1.5 font-medium text-ink">
-                  <Image src={p.logo} alt="" width={22} height={22} className="h-[22px] w-[22px]" />
+                  <Image src={p.logo} alt="" width={22} height={22} unoptimized className="h-[22px] w-[22px]" />
                   {p.name}
                 </span>
               ))}

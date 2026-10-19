@@ -23,7 +23,7 @@ function statusOf(s: Session, now: Date): { label: string; tone: 'ok' | 'wait' |
   const over = new Date(s.endsAt) < now;
   switch (s.status) {
     case 'confirmed':
-      return over ? { label: 'Done', tone: 'off' } : { label: 'Confirmed', tone: 'ok' };
+      return over ? { label: 'Ended', tone: 'off' } : { label: 'Confirmed', tone: 'ok' };
     case 'pending':
       return over
         ? { label: 'Not confirmed in time', tone: 'off' }

@@ -23,6 +23,7 @@ export type DataErrorCode =
   | 'BRIDGE_SECTOR_MISMATCH'
   | 'BRIDGE_NOT_SURFACED'
   | 'SESSION_STARTED'
+  | 'SESSION_NOT_STARTED'
   | 'EMAIL_TAKEN'
   | 'ACCOUNT_EXISTS'
   | 'NOT_A_STUDENT'
@@ -69,6 +70,8 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   BRIDGE_NOT_SURFACED: 409,
   // A session that has begun can no longer be cancelled by the student.
   SESSION_STARTED: 409,
+  // A session's outcome can only be recorded once it has started.
+  SESSION_NOT_STARTED: 409,
   EMAIL_TAKEN: 409,
   // A Google sign-in for an email that already has a password account.
   ACCOUNT_EXISTS: 409,

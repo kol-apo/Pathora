@@ -6,7 +6,7 @@ import {
 } from '@/lib/discovery/questions';
 import { careerProfiles } from '@/lib/data';
 import type { Sector } from '@/lib/types';
-import type { DiscoveryProvider } from '../provider';
+import type { DiscoveryProvider, Generated } from '../provider';
 import { CareerMatchSchema, type CareerMatch } from '../schema';
 
 /**
@@ -78,8 +78,8 @@ export function createMockProvider(): DiscoveryProvider {
   return {
     name: 'mock',
     model: 'rule-based-v1',
-    async generate(answers: DiscoveryAnswers): Promise<CareerMatch> {
-      return generateMockMatch(answers);
+    async generate(answers: DiscoveryAnswers): Promise<Generated> {
+      return { result: generateMockMatch(answers), retryCount: 0 };
     },
   };
 }

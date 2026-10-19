@@ -29,13 +29,13 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
 | Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. |
-| Data layer (MongoDB) | Built and tested: 11 collections, the bridge, access rules and research reports. `npm run verify` (266 checks) and `npm run verify:db` (49 checks) pass. |
+| Data layer (MongoDB) | Built and tested: 11 collections, the bridge, access rules and research reports. `npm run verify` (271 checks) and `npm run verify:db` (56 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
-| Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
+| Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
 | Admin console (`/admin`) | Built: platform counts and the research reports, and mentor review (approve with an interest profile, reject, suspend, reinstate). |
 | `prompts/discovery.json` | Specified, and validated offline by `prompts/validate_prompt.py`. **No live generation yet:** no code calls the Claude API with this specification. |
-| Research events | Recorded on the server under the student's participant code: discovery completed, bridge surfaced, bridge profile viewed, booking requested, booking cancelled, Pathy message sent (never its text). Payloads carry no ids. Students who have not consented are not recorded. |
+| Research events | Recorded on the server under the student's participant code: discovery completed, bridge surfaced, bridge profile viewed, booking requested, booking cancelled, session outcome (held or not, as the mentor reports it), Pathy message sent (never its text). Payloads carry no ids. Students who have not consented are not recorded. |
 | Live AI | Gemini, on Google's free tier for now, through its OpenAI-compatible endpoint (set the `AI_*` variables; see `.env.example`). With no key, Career Discovery runs on the offline matcher, which is also the fallback if Gemini fails. It uses the app's own prompt (`lib/ai/prompt.ts`), not `prompts/discovery.json`, which was written for Claude. On the free tier Google may use prompts and responses to improve its products, and human reviewers may read them, so it is for testing until the consent form covers it or a paid tier is used. |
 | Live video | Not built. The data model already records session timing (`VideoSession`); the session room is still a mock-up. |
 | Student Overview | Built on the student's own data, in reading order: the one next step, their direction and sessions, their three matched mentors, and opportunities in their field. |
@@ -45,7 +45,6 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 ## Known discrepancies
 
 - **Two discovery prompts.** The application's live prompt is `lib/ai/prompt.ts` (version `app-discovery-v1`); the research specification is `prompts/discovery.json` (`discovery-v1.1`). Their output shapes differ until the application moves to the specification.
-- **Retry counts.** `DiscoveryResult.retryCount` is recorded as 0 because the AI provider retries internally without reporting it yet.
 - **ERD names.** The ERD's entity names differ from the collection names, for example "consultants" is `MentorProfile` and "roadmaps" is `DiscoveryResult`. The full mapping is in [docs/data-model.md](docs/data-model.md#erd-names-and-collections). `BridgeRecommendation` is not in the ERD; it was added so bridge conversion is measured per result rather than inferred from bookings.
 - **Model identifier.** The specification asked for `claude-opus-4`, which is not a valid model ID. `prompts/discovery.json` uses `claude-opus-4-0`, the exact ID for Claude Opus 4, which is deprecated. Newer models do not accept `temperature`, so changing model means revisiting the determinism approach. See [prompts/README.md](prompts/README.md).
 - **Resource URLs.** Where the exact programme page was not certain, [lib/research/verified-resources.json](lib/research/verified-resources.json) holds the organisation's homepage. Each needs checking before the study starts.
@@ -125,8 +124,8 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 ### Checking that it works
 
 ```bash
-npm run verify      # 266 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
-npm run verify:db   # 49 live checks: double booking, the bridge, saving results, cancelling, access rules, research events, opportunities, reports
+npm run verify      # 271 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
+npm run verify:db   # 56 live checks: double booking, the bridge, saving results, cancelling, session outcomes, access rules, research events, opportunities, reports
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
@@ -140,97 +139,95 @@ https://www.figma.com/design/xgHTY50iOunFJr3s896yQ0/Pathora?node-id=0-1&t=TDUUwp
 
 ### Screenshots of the app
 
-These were captured before the student app was reorganised around the sidebar and Pathy's chat; the landing page, Overview, Career Discovery, Opportunities and Sessions now look different.
+Captured from the running app against a seeded test database. The student, mentor and admin accounts are test accounts; Pathy's reply is a real one from Gemini.
 
-Captured from the running app against a seeded database. The student, mentor and admin accounts are test accounts.
+#### Public site
 
-#### Public pages
-
-**Landing page**
+**Landing page.** The only public page: how it works, the four sectors, a section for mentors, and about.
 
 ![Landing page](docs/screenshots/01-landing.png)
 
-The full landing page, with how it works, the four sectors and student stories, is in [docs/screenshots/02-landing-full.png](docs/screenshots/02-landing-full.png).
+The full landing page is in [docs/screenshots/02-landing-full.png](docs/screenshots/02-landing-full.png).
 
-**Explore consultants**
+#### Students
 
-![Explore consultants](docs/screenshots/03-explore.png)
+**Sign up**, then **research consent**, which leads straight to the dashboard (the consent wording is still a draft)
 
-**Explore, filtered by sector**
+![Sign up](docs/screenshots/03-sign-up.png)
 
-![Explore filtered to Technology](docs/screenshots/04-explore-sector-filter.png)
+![Research consent](docs/screenshots/04-consent.png)
 
-#### Student
+**Overview for a new student:** one next step, speaking with Pathy
 
-**Sign up**
+![Overview for a new student](docs/screenshots/05-overview-new.png)
 
-![Sign up](docs/screenshots/05-sign-up.png)
+**Career Discovery: Pathy's six questions**, then the reviewing screen
 
-**Research consent**, shown once after sign-up (the wording is still a draft)
+![Pathy's questions](docs/screenshots/06-pathy-questions.png)
 
-![Research consent](docs/screenshots/06-consent.png)
+![Pathy reviewing the answers](docs/screenshots/07-pathy-reviewing.png)
 
-**Career discovery: chatting with the Pathora Guide**
+**Speaking with Pathy** about the saved result. Pathy knows the student's answers, roadmap, mentors and the open opportunities, and names only those.
 
-![Discovery chat](docs/screenshots/07-discovery-chat.png)
+![Speaking with Pathy](docs/screenshots/08-pathy-chat.png)
 
-**Career discovery: reviewing the answers**
+**The roadmap**, ending in the bridge: the three mentors in the field whose interests are closest to the student's. The full page is in [docs/screenshots/09-roadmap.png](docs/screenshots/09-roadmap.png).
 
-![Reviewing screen](docs/screenshots/08-discovery-reviewing.png)
+**Mentors**, with JointHub's mentors first and marked
 
-**Career discovery: results**
+![Mentors](docs/screenshots/10-mentors.png)
 
-![Discovery results](docs/screenshots/09-discovery-results.png)
+**A JointHub mentor's profile** (not taking bookings until their hours are added)
 
-The full results page, with the three-year roadmap and three consultants in the matched sector, is in [docs/screenshots/10-discovery-results-full.png](docs/screenshots/10-discovery-results-full.png).
+![JointHub mentor profile](docs/screenshots/11-partner-profile.png)
 
-**Consultant profile**
+**Booking:** choosing a time from the mentor's weekly hours, shown in the student's timezone
 
-![Consultant profile](docs/screenshots/11-consultant-profile.png)
+![Booking](docs/screenshots/12-booking.png)
 
-**Booking: choosing a day and time**, generated from the mentor's weekly hours and shown in the student's timezone
+**Overview with a booking:** the next session, the direction, the three matches, and opportunities in the student's field
 
-![Booking slot picker](docs/screenshots/12-booking-slot-picker.png)
+![Overview](docs/screenshots/13-overview.png)
 
-**Booking: confirmation**
+**Sessions:** today, coming up (cancellable) and past
 
-![Booking confirmed](docs/screenshots/13-booking-confirmed.png)
+![Sessions](docs/screenshots/14-sessions.png)
 
-**Student dashboard**
+**Opportunities**, read from four publishers' feeds and ALU SPD, filterable by type and by the student's field
 
-![Student dashboard](docs/screenshots/14-student-dashboard.png)
+![Opportunities](docs/screenshots/15-opportunities.png)
 
-**Session room** (interface mock-up; live video is not built yet)
+#### Mentors
 
-![Session room](docs/screenshots/21-session-room.png)
+**Applying**, with LinkedIn, X and other links
 
-#### Mentor
+![Mentor application](docs/screenshots/16-mentor-application.png)
 
-**Applying as a mentor**, with LinkedIn, X and other links
+**Weekly hours**
 
-![Mentor application](docs/screenshots/15-mentor-application.png)
+![Mentor availability](docs/screenshots/17-mentor-availability.png)
 
-**Setting weekly hours**
+**Mentor console:** requests to confirm, upcoming sessions, and sessions to mark as held or not. Students appear by first name only.
 
-![Mentor availability](docs/screenshots/16-mentor-availability.png)
+![Mentor console](docs/screenshots/18-mentor-console.png)
 
-**Mentor console**: a student's request waiting to be confirmed. Mentors see the student's first name only.
+**Profile links**
 
-![Mentor console](docs/screenshots/20-mentor-console.png)
-
-**The approved mentor's public profile**
-
-![Mentor public profile](docs/screenshots/19-mentor-public-profile.png)
+![Mentor profile links](docs/screenshots/19-mentor-profile-links.png)
 
 #### Admin
 
-**Overview**, with the study's measures
+**Reviewing an application** and setting the mentor's interest profile, which the bridge uses for matching
 
-![Admin overview](docs/screenshots/17-admin-overview.png)
+![Admin mentor review](docs/screenshots/20-admin-mentor-review.png)
 
-**Reviewing a mentor application** and setting the mentor's interest profile, which the bridge uses for matching
+**Overview**, with the study's measures: the bridge funnel, AI output validity, and whether sessions take place
 
-![Admin mentor review](docs/screenshots/18-admin-mentor-review.png)
+![Admin overview](docs/screenshots/21-admin-overview.png)
+
+**Opportunities:** reading the feeds on demand, adding ALU SPD listings, and taking listings down
+
+![Admin opportunities](docs/screenshots/22-admin-opportunities.png)
 
 ### Database (MongoDB)
 

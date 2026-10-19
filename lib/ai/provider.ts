@@ -11,7 +11,13 @@ export interface DiscoveryProvider {
   /** Recorded on DiscoveryResult for provenance. */
   readonly name: string;
   readonly model: string;
-  generate(answers: DiscoveryAnswers, signal: AbortSignal): Promise<CareerMatch>;
+  generate(answers: DiscoveryAnswers, signal: AbortSignal): Promise<Generated>;
+}
+
+/** A valid result, and how many times the model had to be asked again to get it. */
+export interface Generated {
+  result: CareerMatch;
+  retryCount: number;
 }
 
 export interface ProviderEnv {

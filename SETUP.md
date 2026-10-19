@@ -54,8 +54,8 @@ It also builds every index. That step is required: the unique index on bookings 
 ## 4. Run the checks
 
 ```bash
-npm run verify          # 266 offline checks; no database, network or API key needed
-npm run verify:db       # 49 checks against the database in MONGODB_URI
+npm run verify          # 271 offline checks; no database, network or API key needed
+npm run verify:db       # 56 checks against the database in MONGODB_URI
 python3 prompts/validate_prompt.py   # 36 checks on the prompt specification
 ```
 

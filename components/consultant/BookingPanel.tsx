@@ -171,7 +171,7 @@ export default function BookingPanel({
             href={`/explore?sector=${encodeURIComponent(consultant.sector)}`}
             className="mt-4 inline-block text-[12.5px] font-medium text-ink underline underline-offset-2"
           >
-            Browse {consultant.sector} consultants
+            Browse {consultant.sector} mentors
           </Link>
         </div>
       )}
@@ -236,7 +236,7 @@ export default function BookingPanel({
                   href="/explore"
                   className="text-[12.5px] font-medium text-ink underline underline-offset-2"
                 >
-                  Browse other consultants
+                  Browse other mentors
                 </Link>
               </div>
             </div>

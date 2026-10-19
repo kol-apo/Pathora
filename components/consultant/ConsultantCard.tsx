@@ -38,9 +38,10 @@ export default function ConsultantCard({
               className="shrink-0 text-muted"
               aria-label="Vetted by Pathora"
             />
-            {partner && <PartnerMark partner={partner} className="ml-auto" />}
           </div>
           <p className="truncate text-[13.5px] text-muted">{roleLine(c)}</p>
+          {/* Its own line, so it never squeezes the name. */}
+          {partner && <PartnerMark partner={partner} className="mt-0.5 self-start" />}
         </div>
       </div>
 

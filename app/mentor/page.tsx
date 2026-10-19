@@ -5,7 +5,8 @@ import { auth } from '@/auth';
 import ConsoleFrame from '@/components/console/ConsoleFrame';
 import BookingResponse from '@/components/console/BookingResponse';
 import Guide from '@/components/brand/Guide';
-import { getMentorSelf, getMyAvailability, listMyBookings } from '@/lib/db/queries/mentorConsole';
+import SessionOutcome from '@/components/console/SessionOutcome';
+import { getMentorSelf, getMyAvailability, listMyBookings, listMyPastSessions } from '@/lib/db/queries/mentorConsole';
 
 export const metadata = { title: 'Mentor · Pathora' };
 export const dynamic = 'force-dynamic';
@@ -43,12 +44,13 @@ export default async function MentorHomePage() {
   const me = await getMentorSelf(session.user.id);
   if (!me) redirect('/become-a-mentor');
 
-  const [bookings, availability] = await Promise.all([
+  const [bookings, availability, past] = await Promise.all([
     listMyBookings(session.user.id),
     getMyAvailability(session.user.id),
+    listMyPastSessions(session.user.id),
   ]);
   const requests = bookings.filter((b) => b.status === 'pending');
-  const confirmed = bookings.filter((b) => b.status === 'confirmed');
+  const confirmed = bookings.filter((b) => b.status === 'confirmed' && !past.awaiting.some((a) => a.id === b.id));
   const hasHours = (availability?.weekly.length ?? 0) > 0;
   const firstName = me.displayName.split(' ')[0];
 
@@ -139,6 +141,55 @@ export default async function MentorHomePage() {
           </ul>
         )}
       </section>
+      {past.awaiting.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-sky-muted">
+          <div className="border-b border-sky-muted bg-sky-soft px-5 py-4">
+            <h2 className="text-[15px] font-semibold text-ink">Did these sessions happen? · {past.awaiting.length}</h2>
+            <p className="mt-0.5 text-[13px] text-muted">It takes a second, and it is how Pathora knows students are being helped.</p>
+          </div>
+          <ul className="divide-y divide-line">
+            {past.awaiting.map((b) => (
+              <li key={b.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[15px] font-medium text-ink">
+                    {b.studentName} · {when(b.startsAt, me.timezone)}
+                  </p>
+                  <p className="text-[13.5px] text-muted">{b.topic}</p>
+                </div>
+                <SessionOutcome bookingId={b.id} studentName={b.studentName} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {past.recent.length > 0 && (
+        <section className="overflow-hidden rounded-xl border border-line">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-[15px] font-semibold text-ink">Past sessions</h2>
+          </div>
+          <ul className="divide-y divide-line">
+            {past.recent.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[14.5px] text-ink">
+                    {b.studentName} · {when(b.startsAt, me.timezone)}
+                  </p>
+                  <p className="truncate text-[13px] text-muted">{b.topic}</p>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-medium ${
+                    b.status === 'completed' ? 'bg-available/10 text-available' : 'bg-fill text-muted'
+                  }`}
+                >
+                  {b.status === 'completed' ? 'Completed' : 'Did not take place'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <p className="text-[12.5px] text-faint">Times are shown in your timezone ({me.timezone}).</p>
     </ConsoleFrame>
   );
