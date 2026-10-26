@@ -62,6 +62,7 @@ import {
   type DiscoveryAnswers,
 } from '../lib/discovery/questions';
 import { DiscoveryAnswersSchema } from '../lib/discovery/validation';
+import { startsFromWindows, windowsFromStarts } from '../lib/booking/hourGrid';
 import { extractJson, parseCareerMatch, CareerMatchSchema } from '../lib/ai/schema';
 import { generateMockMatch } from '../lib/ai/providers/mock';
 import { createLlmProvider } from '../lib/ai/providers/llm';
@@ -1364,6 +1365,26 @@ async function videoTests() {
   ok('the database refuses any recording field on a video session', refused);
 }
 
+async function hourGridTests() {
+  section('Availability editor: tapped hours and saved windows');
+  const asText = (ws: { startMinute: number; endMinute: number }[]) => ws.map((w) => `${w.startMinute}-${w.endMinute}`).join(',');
+  ok('09:00-12:00 offers sessions at 9, 10 and 11', startsFromWindows([{ startMinute: 540, endMinute: 720 }]).join(',') === '540,600,660');
+  ok('a window too short for a session offers none', startsFromWindows([{ startMinute: 540, endMinute: 570 }]).length === 0);
+  ok('hours next to each other become one window', asText(windowsFromStarts([600, 540, 660])) === '540-720');
+  ok('a gap splits the windows', asText(windowsFromStarts([540, 600, 840, 900])) === '540-660,840-960');
+  ok('repeated hours are counted once', asText(windowsFromStarts([540, 540])) === '540-600');
+  ok('an hour that would overlap the one before is dropped', asText(windowsFromStarts([540, 570])) === '540-600');
+  ok('no hours means no windows', windowsFromStarts([]).length === 0);
+  const seeded = [{ startMinute: 540, endMinute: 720 }, { startMinute: 840, endMinute: 1020 }];
+  ok('saved hours survive a round trip unchanged', asText(windowsFromStarts(startsFromWindows(seeded))) === asText(seeded));
+  // Wednesday 4 November 2026: tap 10:00, 11:00 and 15:00.
+  const rules = baseRules({ weekly: windowsFromStarts([600, 660, 900]).map((w) => ({ dayOfWeek: 3, ...w })) });
+  const now = new Date('2026-11-01T00:00:00Z');
+  const offered = generateSlots({ rules, timeZone: 'UTC', now, from: now, to: new Date('2026-11-05T00:00:00Z') })
+    .map((s) => s.startsAt.toISOString().slice(11, 16));
+  ok('students are offered exactly the tapped hours', offered.join(',') === '10:00,11:00,15:00', offered.join(','));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   await timezoneTests();
@@ -1378,6 +1399,7 @@ async function main() {
   await opportunityTests();
   await accountRecoveryTests();
   await videoTests();
+  await hourGridTests();
 
   console.log(`\n${'═'.repeat(62)}`);
   console.log(failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${passed} passed, ${failed} FAILED`);

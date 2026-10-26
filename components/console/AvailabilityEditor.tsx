@@ -1,118 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, CalendarPlus, Check, Loader2, Plus, X } from 'lucide-react';
+import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { sameStarts, startsFromWindows, windowsFromStarts, type TimeWindow } from '@/lib/booking/hourGrid';
 
-interface Window {
+interface WeeklyWindow extends TimeWindow {
   dayOfWeek: number;
-  startMinute: number;
-  endMinute: number;
 }
 
-interface TimeWindow {
-  startMinute: number;
-  endMinute: number;
-}
-
-/** One calendar date with its own hours, or a day off. */
+/** One calendar date with its own hours, or a day off, as the server sends it. */
 interface DateHours {
   date: string; // YYYY-MM-DD, in the mentor's timezone
   blocked: boolean;
   windows: TimeWindow[];
 }
 
+/** A date that differs from the usual week, as the editor holds it. */
+interface Override {
+  blocked: boolean;
+  starts: number[];
+}
+
 // Monday first, the way most people think about a working week.
 const DAYS = [
-  { dow: 1, label: 'Monday' },
-  { dow: 2, label: 'Tuesday' },
-  { dow: 3, label: 'Wednesday' },
-  { dow: 4, label: 'Thursday' },
-  { dow: 5, label: 'Friday' },
-  { dow: 6, label: 'Saturday' },
-  { dow: 0, label: 'Sunday' },
+  { dow: 1, short: 'Mon', long: 'Monday' },
+  { dow: 2, short: 'Tue', long: 'Tuesday' },
+  { dow: 3, short: 'Wed', long: 'Wednesday' },
+  { dow: 4, short: 'Thu', long: 'Thursday' },
+  { dow: 5, short: 'Fri', long: 'Friday' },
+  { dow: 6, short: 'Sat', long: 'Saturday' },
+  { dow: 0, short: 'Sun', long: 'Sunday' },
 ];
+const LONG_DAY = Object.fromEntries(DAYS.map((d) => [d.dow, d.long]));
 
-/** Every half hour from 06:00 to 22:00. */
-const TIMES = Array.from({ length: 33 }, (_, i) => 360 + i * 30);
+/** Session start times offered by default: every hour from 06:00 to 21:00. */
+const DEFAULT_HOURS = Array.from({ length: 16 }, (_, i) => 360 + i * 60);
+const WORKDAY = [540, 600, 660, 720, 780, 840, 900, 960]; // 09:00-17:00
+const MAX_DAYS_AHEAD = 365;
+
 const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
-const dowOf = (iso: string) => {
+const toUTC = (iso: string) => {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return new Date(Date.UTC(y, m - 1, d));
 };
-
-/** "Mon 3 Nov 2026". Formatted in UTC so the date never shifts a day. */
-const dateLabel = (iso: string) => {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+const isoOf = (dt: Date) => dt.toISOString().slice(0, 10);
+const addDays = (iso: string, n: number) => {
+  const dt = toUTC(iso);
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return isoOf(dt);
 };
+const dowOf = (iso: string) => toUTC(iso).getUTCDay();
+/** Formatted in UTC so a date never shifts by a day. */
+const label = (iso: string, opts: Intl.DateTimeFormatOptions) =>
+  toUTC(iso).toLocaleDateString('en-GB', { ...opts, timeZone: 'UTC' });
 
-const selectClass =
-  'h-10 rounded border border-line bg-white px-3 text-[14px] text-ink focus:border-navy focus:outline-none';
-
-/** Start and end selects plus a remove button, shared by weekly and date rows. */
-function WindowRow({
-  w,
-  label,
-  onChange,
-  onRemove,
-}: {
-  w: TimeWindow;
-  label: string;
-  onChange: (patch: Partial<TimeWindow>) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <select
-        value={w.startMinute}
-        onChange={(e) => onChange({ startMinute: Number(e.target.value) })}
-        aria-label={`${label} start time`}
-        className={selectClass}
-      >
-        {TIMES.map((t) => (
-          <option key={t} value={t}>
-            {fmt(t)}
-          </option>
-        ))}
-      </select>
-      <span className="text-[13px] text-muted">to</span>
-      <select
-        value={w.endMinute}
-        onChange={(e) => onChange({ endMinute: Number(e.target.value) })}
-        aria-label={`${label} end time`}
-        className={selectClass}
-      >
-        {TIMES.map((t) => (
-          <option key={t} value={t}>
-            {fmt(t)}
-          </option>
-        ))}
-      </select>
-      <button
-        onClick={onRemove}
-        aria-label={`Remove ${label} ${fmt(w.startMinute)} to ${fmt(w.endMinute)}`}
-        className="rounded p-2 text-faint transition-colors hover:bg-surface hover:text-ink"
-      >
-        <X size={16} />
-      </button>
-    </div>
-  );
+function weekFromWindows(windows: WeeklyWindow[]): Record<number, number[]> {
+  const week: Record<number, number[]> = {};
+  for (const { dow } of DAYS) {
+    week[dow] = startsFromWindows(windows.filter((w) => w.dayOfWeek === dow));
+  }
+  return week;
 }
 
-/** The next window to offer after the ones already there: 09:00-12:00 first. */
-function nextWindow(existing: TimeWindow[]): TimeWindow {
-  const start = existing.length ? Math.max(...existing.map((w) => w.endMinute)) + 60 : 540;
-  const safeStart = Math.min(start, 1260);
-  return { startMinute: safeStart, endMinute: Math.min(safeStart + 180, 1320) };
-}
+const toggle = (list: number[], m: number, on: boolean) =>
+  on ? [...new Set([...list, m])].sort((a, b) => a - b) : list.filter((x) => x !== m);
 
 export default function AvailabilityEditor({
   initial,
@@ -121,7 +74,7 @@ export default function AvailabilityEditor({
   timezone,
   today,
 }: {
-  initial: Window[];
+  initial: WeeklyWindow[];
   initialDates: DateHours[];
   initialAccepting: boolean;
   timezone: string;
@@ -129,55 +82,135 @@ export default function AvailabilityEditor({
   today: string;
 }) {
   const router = useRouter();
-  const [windows, setWindows] = useState<Window[]>(initial);
-  const [dates, setDates] = useState<DateHours[]>(initialDates);
-  const [newDate, setNewDate] = useState('');
+  const [week, setWeek] = useState(() => weekFromWindows(initial));
+  const [overrides, setOverrides] = useState<Record<string, Override>>(() =>
+    Object.fromEntries(
+      initialDates.map((d) => [d.date, { blocked: d.blocked, starts: d.blocked ? [] : startsFromWindows(d.windows) }]),
+    ),
+  );
   const [accepting, setAccepting] = useState(initialAccepting);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [month, setMonth] = useState(today.slice(0, 7)); // YYYY-MM
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const update = (index: number, patch: Partial<Window>) =>
-    setWindows((ws) => ws.map((w, i) => (i === index ? { ...w, ...patch } : w)));
+  // The hours shown: 06:00-21:00, plus any odd start time already saved.
+  const hours = useMemo(() => {
+    const saved = [
+      ...Object.values(weekFromWindows(initial)).flat(),
+      ...initialDates.flatMap((d) => startsFromWindows(d.windows)),
+    ];
+    return [...new Set([...DEFAULT_HOURS, ...saved])].sort((a, b) => a - b);
+  }, [initial, initialDates]);
 
-  const addWindow = (dow: number) => {
-    const sameDay = windows.filter((w) => w.dayOfWeek === dow);
-    setWindows((ws) => [...ws, { dayOfWeek: dow, ...nextWindow(sameDay) }]);
-  };
+  const payload = (w: typeof week, o: typeof overrides, a: boolean) => ({
+    acceptingBookings: a,
+    weekly: DAYS.flatMap(({ dow }) => windowsFromStarts(w[dow]).map((x) => ({ dayOfWeek: dow, ...x }))),
+    dates: Object.entries(o)
+      .filter(([date]) => date >= today)
+      .sort(([a1], [b1]) => a1.localeCompare(b1))
+      .map(([date, x]) => ({ date, blocked: x.blocked, windows: x.blocked ? [] : windowsFromStarts(x.starts) })),
+  });
+  const [savedState, setSavedState] = useState(() =>
+    JSON.stringify(payload(weekFromWindows(initial), overrides, initialAccepting)),
+  );
+  const current = JSON.stringify(payload(week, overrides, accepting));
+  const dirty = current !== savedState;
 
-  const updateDate = (date: string, patch: (d: DateHours) => DateHours) =>
-    setDates((ds) => ds.map((d) => (d.date === date ? patch(d) : d)));
-
-  const addDate = () => {
-    setMessage(null);
-    if (!newDate || newDate < today) {
-      setMessage({ ok: false, text: 'Choose today or a later date.' });
-      return;
-    }
-    if (dates.some((d) => d.date === newDate)) {
-      setMessage({ ok: false, text: `${dateLabel(newDate)} is already in your list.` });
-      return;
-    }
-    // Start from that weekday's usual hours, so changing one day is a small edit.
-    const usual = windows
-      .filter((w) => w.dayOfWeek === dowOf(newDate))
-      .map(({ startMinute, endMinute }) => ({ startMinute, endMinute }));
-    const entry: DateHours = { date: newDate, blocked: false, windows: usual.length ? usual : [nextWindow([])] };
-    setDates((ds) => [...ds, entry].sort((a, b) => a.date.localeCompare(b.date)));
-    setNewDate('');
-  };
+  // Warn before leaving with unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   const save = async () => {
     setBusy(true);
     setMessage(null);
+    const body = current;
     const res = await fetch('/api/mentor/availability', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weekly: windows, dates, acceptingBookings: accepting }),
+      body,
     });
     const data = await res.json().catch(() => ({}));
     setBusy(false);
-    setMessage(res.ok ? { ok: true, text: 'Saved. Students now see these times.' } : { ok: false, text: data.error ?? 'Could not save.' });
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      setSavedState(body);
+      setMessage({ ok: true, text: 'Saved. Students now see these times.' });
+      router.refresh();
+    } else {
+      setMessage({ ok: false, text: data.error ?? 'Could not save.' });
+    }
+  };
+
+  // ── Usual week: tap a cell, or drag across cells with a mouse ──────────────
+  const paint = useRef<boolean | null>(null);
+  const skipClick = useRef(false);
+  useEffect(() => {
+    const stop = () => (paint.current = null);
+    window.addEventListener('pointerup', stop);
+    return () => window.removeEventListener('pointerup', stop);
+  }, []);
+  const setCell = (dow: number, m: number, on: boolean) => {
+    setMessage(null);
+    setWeek((w) => ({ ...w, [dow]: toggle(w[dow], m, on) }));
+  };
+  const sessionsPerWeek = DAYS.reduce((n, { dow }) => n + week[dow].length, 0);
+
+  // ── Specific dates ─────────────────────────────────────────────────────────
+  const lastDay = addDays(today, MAX_DAYS_AHEAD);
+  const usualFor = (date: string) => week[dowOf(date)];
+  const stateOf = (date: string): 'off' | 'changed' | 'open' | 'closed' => {
+    const o = overrides[date];
+    if (o?.blocked) return 'off';
+    if (o) return 'changed';
+    return usualFor(date).length ? 'open' : 'closed';
+  };
+  const startsOn = (date: string) => overrides[date]?.starts ?? usualFor(date);
+
+  const setDate = (date: string, next: Override | null) => {
+    setMessage(null);
+    setOverrides((o) => {
+      const copy = { ...o };
+      if (next === null) delete copy[date];
+      else copy[date] = next;
+      return copy;
+    });
+  };
+  const toggleDateHour = (date: string, m: number) => {
+    const current = startsOn(date);
+    const next = toggle(current, m, !current.includes(m));
+    if (sameStarts(next, usualFor(date))) setDate(date, null);
+    else if (next.length === 0) setDate(date, { blocked: true, starts: [] });
+    else setDate(date, { blocked: false, starts: next });
+  };
+
+  const monthStart = `${month}-01`;
+  const lead = (dowOf(monthStart) + 6) % 7; // blank cells before the 1st, Monday first
+  const daysInMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  const cells = [
+    ...Array.from({ length: lead }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => addDays(monthStart, i)),
+  ];
+  const shiftMonth = (n: number) => {
+    const dt = toUTC(monthStart);
+    dt.setUTCMonth(dt.getUTCMonth() + n);
+    setMonth(isoOf(dt).slice(0, 7));
+  };
+  const canGoBack = month > today.slice(0, 7);
+  const canGoForward = month < lastDay.slice(0, 7);
+
+  const changed = Object.entries(overrides)
+    .filter(([date]) => date >= today)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  const cellClass: Record<ReturnType<typeof stateOf>, string> = {
+    open: 'bg-sky-soft text-navy font-medium',
+    changed: 'bg-sky-soft text-navy font-medium',
+    off: 'text-faint line-through',
+    closed: 'text-muted',
   };
 
   return (
@@ -195,171 +228,305 @@ export default function AvailabilityEditor({
         />
       </label>
 
-      <section className="overflow-hidden rounded-xl border border-line">
-        <div className="border-b border-line px-5 py-4">
-          <h2 className="text-[15px] font-semibold text-ink">Weekly hours</h2>
-          <p className="mt-0.5 text-[12.5px] text-muted">
-            In your timezone, {timezone}. Sessions are 45 minutes with a 15-minute break between them.
-          </p>
-        </div>
-        <ul className="divide-y divide-line">
-          {DAYS.map(({ dow, label }) => {
-            const entries = windows.map((w, i) => ({ w, i })).filter(({ w }) => w.dayOfWeek === dow);
-            return (
-              <li key={dow} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
-                <span className="w-28 shrink-0 pt-2 text-[14px] font-medium text-ink">{label}</span>
-                <div className="flex flex-1 flex-col gap-2">
-                  {entries.length === 0 && <span className="pt-2 text-[13.5px] text-faint">Unavailable</span>}
-                  {entries.map(({ w, i }) => (
-                    <WindowRow
-                      key={i}
-                      w={w}
-                      label={label}
-                      onChange={(patch) => update(i, patch)}
-                      onRemove={() => setWindows((ws) => ws.filter((_, j) => j !== i))}
-                    />
-                  ))}
-                </div>
-                <button
-                  onClick={() => addWindow(dow)}
-                  className="flex shrink-0 items-center gap-1.5 self-start rounded px-3 py-2 text-[13px] font-medium text-navy transition-colors hover:bg-sky-soft"
-                >
-                  <Plus size={15} />
-                  Add hours
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      <section className="overflow-hidden rounded-xl border border-line">
-        <div className="border-b border-line px-5 py-4">
-          <h2 className="text-[15px] font-semibold text-ink">Specific dates</h2>
-          <p className="mt-0.5 text-[12.5px] text-muted">
-            Change your hours for one date, or take a day off. A date here replaces your weekly hours for that day
-            only.
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              value={newDate}
-              min={today}
-              onChange={(e) => setNewDate(e.target.value)}
-              aria-label="Date to add"
-              className={selectClass}
-            />
+      {/* ── 1. Usual week ─────────────────────────────────────────────── */}
+      <section className="rounded-xl border border-line">
+        <div className="flex flex-col gap-3 border-b border-line px-5 py-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-[15px] font-semibold text-ink">1. Your usual week</h2>
+            <p className="mt-0.5 text-[13px] text-muted">
+              Tap the hours you are free. Each hour is one 45-minute session. Times are in {timezone}.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
             <button
-              onClick={addDate}
-              disabled={!newDate}
-              className="flex items-center gap-1.5 rounded px-3 py-2 text-[13px] font-medium text-navy transition-colors hover:bg-sky-soft disabled:opacity-50"
+              onClick={() => setWeek((w) => ({ ...w, 1: WORKDAY, 2: WORKDAY, 3: WORKDAY, 4: WORKDAY, 5: WORKDAY }))}
+              className="rounded border border-line px-3 py-1.5 text-[13px] font-medium text-ink transition-colors hover:bg-surface"
             >
-              <CalendarPlus size={15} />
-              Add date
+              Weekdays 9 to 5
+            </button>
+            <button
+              onClick={() => setWeek(Object.fromEntries(DAYS.map(({ dow }) => [dow, []])))}
+              className="rounded border border-line px-3 py-1.5 text-[13px] font-medium text-muted transition-colors hover:bg-surface hover:text-ink"
+            >
+              Clear
             </button>
           </div>
         </div>
-        {dates.length === 0 ? (
-          <p className="px-5 py-4 text-[13.5px] text-faint">No specific dates. Your weekly hours apply every week.</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {dates.map((d) => {
-              const label = dateLabel(d.date);
-              return (
-                <li key={d.date} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start">
-                  <span className="w-40 shrink-0 pt-2 text-[14px] font-medium text-ink">{label}</span>
-                  <div className="flex flex-1 flex-col gap-2">
-                    <div role="radiogroup" aria-label={`${label} availability`} className="flex gap-1">
-                      {[
-                        { blocked: false, text: 'Available' },
-                        { blocked: true, text: 'Day off' },
-                      ].map((opt) => (
-                        <button
-                          key={opt.text}
-                          role="radio"
-                          aria-checked={d.blocked === opt.blocked}
-                          onClick={() =>
-                            updateDate(d.date, (x) => ({
-                              ...x,
-                              blocked: opt.blocked,
-                              windows: !opt.blocked && x.windows.length === 0 ? [nextWindow([])] : x.windows,
-                            }))
-                          }
-                          className={`rounded px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                            d.blocked === opt.blocked
-                              ? 'bg-navy text-white'
-                              : 'border border-line text-muted hover:bg-surface hover:text-ink'
-                          }`}
-                        >
-                          {opt.text}
-                        </button>
-                      ))}
-                    </div>
-                    {d.blocked ? (
-                      <span className="text-[13.5px] text-faint">No sessions can be booked on this date.</span>
-                    ) : (
-                      <>
-                        {d.windows.map((w, i) => (
-                          <WindowRow
-                            key={i}
-                            w={w}
-                            label={label}
-                            onChange={(patch) =>
-                              updateDate(d.date, (x) => ({
-                                ...x,
-                                windows: x.windows.map((y, j) => (j === i ? { ...y, ...patch } : y)),
-                              }))
-                            }
-                            onRemove={() =>
-                              updateDate(d.date, (x) => ({ ...x, windows: x.windows.filter((_, j) => j !== i) }))
-                            }
-                          />
-                        ))}
-                        {d.windows.length === 0 && (
-                          <span className="text-[13.5px] text-faint">Add hours, or mark it as a day off.</span>
-                        )}
-                        {d.windows.length < 4 && (
-                          <button
-                            onClick={() =>
-                              updateDate(d.date, (x) => ({ ...x, windows: [...x.windows, nextWindow(x.windows)] }))
-                            }
-                            className="flex items-center gap-1.5 self-start rounded px-3 py-2 text-[13px] font-medium text-navy transition-colors hover:bg-sky-soft"
-                          >
-                            <Plus size={15} />
-                            Add hours
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setDates((ds) => ds.filter((x) => x.date !== d.date))}
-                    aria-label={`Remove ${label}`}
-                    className="shrink-0 self-start rounded px-3 py-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface hover:text-ink"
-                  >
-                    Remove date
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+
+        <div className="select-none px-3 py-4 sm:px-5">
+          <div className="grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] gap-1">
+            <span />
+            {DAYS.map((d) => (
+              <span key={d.dow} className="pb-1 text-center text-[12px] font-semibold text-ink">
+                {d.short}
+              </span>
+            ))}
+            {hours.map((m) => (
+              <div key={m} className="contents">
+                <span className="flex items-center text-[11.5px] tabular-nums text-muted">{fmt(m)}</span>
+                {DAYS.map((d) => {
+                  const on = week[d.dow].includes(m);
+                  return (
+                    <button
+                      key={d.dow}
+                      aria-pressed={on}
+                      aria-label={`${d.long} ${fmt(m)}`}
+                      onPointerDown={(e) => {
+                        if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                        skipClick.current = true;
+                        paint.current = !on;
+                        setCell(d.dow, m, !on);
+                      }}
+                      onPointerEnter={(e) => {
+                        if (e.pointerType === 'mouse' && paint.current !== null) setCell(d.dow, m, paint.current);
+                      }}
+                      onClick={() => {
+                        if (skipClick.current) {
+                          skipClick.current = false;
+                          return;
+                        }
+                        setCell(d.dow, m, !on);
+                      }}
+                      className={`h-8 rounded transition-colors ${
+                        on ? 'bg-navy hover:bg-navy-deep' : 'bg-fill hover:bg-sky-muted'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[13px] text-muted">
+            {sessionsPerWeek === 0
+              ? 'No hours yet. Students cannot book you until you add some.'
+              : `${sessionsPerWeek} session${sessionsPerWeek === 1 ? '' : 's'} a week.`}
+          </p>
+        </div>
       </section>
 
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+      {/* ── 2. Specific dates ─────────────────────────────────────────── */}
+      <section className="rounded-xl border border-line">
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="text-[15px] font-semibold text-ink">2. Specific dates (optional)</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
+            Tap a date to take it off or change its hours. Every other date follows your usual week.
+          </p>
+        </div>
+
+        <div className="grid gap-6 px-5 py-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+          {/* Calendar */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                onClick={() => shiftMonth(-1)}
+                disabled={!canGoBack}
+                aria-label="Previous month"
+                className="rounded p-1.5 text-ink transition-colors hover:bg-surface disabled:opacity-30"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span className="text-[14px] font-semibold text-ink">
+                {label(monthStart, { month: 'long', year: 'numeric' })}
+              </span>
+              <button
+                onClick={() => shiftMonth(1)}
+                disabled={!canGoForward}
+                aria-label="Next month"
+                className="rounded p-1.5 text-ink transition-colors hover:bg-surface disabled:opacity-30"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {DAYS.map((d) => (
+                <span key={d.dow} className="pb-1 text-[11.5px] font-medium text-muted">
+                  {d.short.slice(0, 2)}
+                </span>
+              ))}
+              {cells.map((date, i) => {
+                if (!date) return <span key={`b${i}`} />;
+                const outOfRange = date < today || date > lastDay;
+                const state = stateOf(date);
+                const isSelected = selected === date;
+                return (
+                  <button
+                    key={date}
+                    disabled={outOfRange}
+                    onClick={() => setSelected(isSelected ? null : date)}
+                    aria-pressed={isSelected}
+                    aria-label={`${label(date, { weekday: 'long', day: 'numeric', month: 'long' })}, ${
+                      { open: 'open', changed: 'changed hours', off: 'day off', closed: 'no hours' }[state]
+                    }`}
+                    className={`relative flex h-10 items-center justify-center rounded text-[13.5px] tabular-nums transition-colors disabled:cursor-default disabled:bg-transparent disabled:text-line ${
+                      isSelected ? 'bg-navy font-semibold text-white' : `${cellClass[state]} hover:ring-1 hover:ring-navy`
+                    }`}
+                  >
+                    {Number(date.slice(8))}
+                    {state === 'changed' && !outOfRange && (
+                      <span
+                        className={`absolute bottom-1 h-1 w-1 rounded-full ${isSelected ? 'bg-white' : 'bg-navy'}`}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-sm bg-sky-soft ring-1 ring-sky-muted" /> Open
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-navy" /> Changed
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="line-through">12</span> Day off
+              </span>
+            </div>
+          </div>
+
+          {/* The chosen date */}
+          <div className="min-w-0">
+            {selected ? (
+              <DatePanel
+                date={selected}
+                state={stateOf(selected)}
+                usual={usualFor(selected)}
+                starts={startsOn(selected)}
+                hours={hours}
+                onToggle={(m) => toggleDateHour(selected, m)}
+                onDayOff={() => setDate(selected, { blocked: true, starts: [] })}
+                onReset={() => setDate(selected, null)}
+              />
+            ) : (
+              <div className="flex h-full flex-col justify-center rounded-lg bg-surface p-5 text-[13.5px] text-muted">
+                <p>Pick a date on the calendar.</p>
+                {changed.length > 0 && (
+                  <>
+                    <p className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-ink">Your changed dates</p>
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {changed.map(([date, o]) => (
+                        <li key={date}>
+                          <button
+                            onClick={() => {
+                              setSelected(date);
+                              setMonth(date.slice(0, 7));
+                            }}
+                            className="rounded-full border border-line bg-white px-3 py-1 text-[12.5px] text-ink transition-colors hover:border-navy"
+                          >
+                            {label(date, { weekday: 'short', day: 'numeric', month: 'short' })}
+                            <span className="text-muted">
+                              {' · '}
+                              {o.blocked ? 'Day off' : `${o.starts.length} session${o.starts.length === 1 ? '' : 's'}`}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Save: stays in view while there are changes. */}
+      <div
+        className={`flex items-center gap-3 rounded-xl border border-line bg-white/95 px-4 py-3 backdrop-blur ${
+          dirty ? 'sticky bottom-[72px] z-30 shadow-[0_4px_24px_rgba(0,0,0,0.08)] lg:bottom-4' : ''
+        }`}
+      >
         <button
           onClick={save}
-          disabled={busy}
-          className="flex items-center gap-2 rounded bg-navy px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-navy-deep disabled:opacity-60"
+          disabled={busy || !dirty}
+          className="flex shrink-0 items-center gap-2 rounded bg-navy px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-deep disabled:opacity-50"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          Save hours
+          Save changes
         </button>
-        {message && (
+        {message ? (
           <p role="status" className="flex items-center gap-2 text-[13.5px] text-ink">
             {message.ok ? <Check size={15} className="text-available" /> : <AlertCircle size={15} />}
             {message.text}
           </p>
+        ) : (
+          <p className="text-[13.5px] text-muted">{dirty ? 'You have unsaved changes.' : 'All changes saved.'}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DatePanel({
+  date,
+  state,
+  usual,
+  starts,
+  hours,
+  onToggle,
+  onDayOff,
+  onReset,
+}: {
+  date: string;
+  state: 'off' | 'changed' | 'open' | 'closed';
+  usual: number[];
+  starts: number[];
+  hours: number[];
+  onToggle: (m: number) => void;
+  onDayOff: () => void;
+  onReset: () => void;
+}) {
+  const weekday = LONG_DAY[dowOf(date)];
+  const status = {
+    open: `Your usual ${weekday} hours.`,
+    closed: `You are not usually free on ${weekday}s. Tap hours to open this date.`,
+    changed: 'Changed for this date only.',
+    off: 'Day off. No sessions can be booked.',
+  }[state];
+
+  return (
+    <div>
+      <h3 className="text-[15px] font-semibold text-ink">
+        {label(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+      </h3>
+      <p className="mt-0.5 text-[13px] text-muted">{status}</p>
+
+      {state !== 'off' && (
+        <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Hours on this date">
+          {hours.map((m) => {
+            const on = starts.includes(m);
+            return (
+              <button
+                key={m}
+                aria-pressed={on}
+                onClick={() => onToggle(m)}
+                className={`w-[62px] rounded py-1.5 text-[13px] tabular-nums transition-colors ${
+                  on ? 'bg-navy font-medium text-white hover:bg-navy-deep' : 'bg-fill text-muted hover:bg-sky-muted hover:text-ink'
+                }`}
+              >
+                {fmt(m)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {state !== 'off' && usual.length + starts.length > 0 && (
+          <button
+            onClick={onDayOff}
+            className="rounded border border-line px-3 py-1.5 text-[13px] font-medium text-ink transition-colors hover:bg-surface"
+          >
+            Take the day off
+          </button>
+        )}
+        {(state === 'changed' || state === 'off') && (
+          <button
+            onClick={onReset}
+            className="rounded border border-line px-3 py-1.5 text-[13px] font-medium text-ink transition-colors hover:bg-surface"
+          >
+            {state === 'off' ? 'Undo day off' : `Back to usual ${weekday} hours`}
+          </button>
         )}
       </div>
     </div>

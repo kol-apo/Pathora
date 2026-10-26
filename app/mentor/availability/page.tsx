@@ -19,7 +19,7 @@ export default async function MentorAvailabilityPage() {
     <ConsoleFrame
       variant="mentor"
       title="Availability"
-      subtitle="When students can book you: your usual week, plus any dates that differ. Open slots are worked out automatically."
+      subtitle="Set your usual week once, then change any single date when your plans differ."
     >
       <AvailabilityEditor
         initial={availability.weekly}
