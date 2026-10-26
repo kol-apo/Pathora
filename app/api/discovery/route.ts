@@ -19,6 +19,8 @@ import { logStudentEvent } from '@/lib/db/queries/research';
 
 // The agent calls an external model; never prerender or cache this.
 export const dynamic = 'force-dynamic';
+// Waits on the AI model or on publishers' feeds; Vercel's default limit is 10 seconds.
+export const maxDuration = 60;
 
 type NotSaved = 'signed-out' | 'needs-consent' | 'not-a-student';
 

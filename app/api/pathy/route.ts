@@ -23,6 +23,8 @@ import { roleLine } from '@/lib/mentors';
 import { deadlineLabel } from '@/lib/opportunities/format';
 
 export const dynamic = 'force-dynamic';
+// Waits on the AI model or on publishers' feeds; Vercel's default limit is 10 seconds.
+export const maxDuration = 60;
 
 /*
  * POST /api/pathy — one turn of the conversation with Pathy.

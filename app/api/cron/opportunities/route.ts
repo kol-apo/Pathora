@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { refreshOpportunities } from '@/lib/db/queries/opportunities';
 
 export const dynamic = 'force-dynamic';
+// Waits on the AI model or on publishers' feeds; Vercel's default limit is 10 seconds.
+export const maxDuration = 60;
 
 /**
  * GET /api/cron/opportunities — read the opportunity feeds. For a scheduler
