@@ -49,8 +49,12 @@ lerna-debug.log*
 # lives only in the approved storage location, never in this repository.
 # -----------------------------------------------------------------------------
 data/
+# Source code, not participant data: the JointHub directory used by the import script.
+!scripts/data/
 responses/
 participants/
 consent/
+# Source code, not consent records: the API route that saves a student's agreement.
+!app/api/consent/
 *.csv
 *.xlsx
