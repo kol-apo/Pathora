@@ -29,7 +29,7 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
 | Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. |
-| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (279 checks) and `npm run verify:db` (72 checks) pass. |
+| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (288 checks) and `npm run verify:db` (80 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. "Forgot your password?" emails a link that works once, for an hour; resetting signs the account out everywhere. The Account page lets students withdraw from the study, which deletes the account and everything recorded about them, research events included. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
@@ -37,7 +37,7 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | `prompts/discovery.json` | Specified, and validated offline by `prompts/validate_prompt.py`. **No live generation yet:** no code calls the Claude API with this specification. |
 | Research events | Recorded on the server under the student's participant code: discovery completed, bridge surfaced, bridge profile viewed, booking requested, booking cancelled, session outcome (held or not, as the mentor reports it), Pathy message sent (never its text). Payloads carry no ids. Students who have not consented are not recorded. |
 | Live AI | Gemini, on Google's free tier for now, through its OpenAI-compatible endpoint (set the `AI_*` variables; see `.env.example`). With no key, Career Discovery runs on the offline matcher, which is also the fallback if Gemini fails. It uses the app's own prompt (`lib/ai/prompt.ts`), not `prompts/discovery.json`, which was written for Claude. On the free tier Google may use prompts and responses to improve its products, and human reviewers may read them, so it is for testing until the consent form covers it or a paid tier is used. |
-| Live video | Not built. The data model already records session timing (`VideoSession`); the session room is still a mock-up. |
+| Live video | Built with Daily (daily.co). Each confirmed booking gets its own private room, open from 10 minutes before to 15 minutes after the session, two people at most, never recorded. Only the booking's student and mentor can get a pass to enter, issued by Pathora. Daily's call screen is embedded in the session room; when each person joined and how long the call ran (from Daily's own meeting records) are stored in `VideoSession`. |
 | Student Overview | Built on the student's own data, in reading order: the one next step, their direction and sessions, their three matched mentors, and opportunities in their field. |
 | Consent wording | Placeholder, marked as a draft on screen, until the approved consent form is added to `lib/research/consent.ts`. |
 | Deployment | Not deployed. See [Deployment plan](#deployment-plan). |
@@ -117,6 +117,7 @@ https://github.com/kol-apo/Pathora
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Only for Google sign-in | From Google Cloud Console. Without them the site offers email and password only |
 | `AI_PROVIDER` | No | `mock` (default, offline, no key) or `openai-compatible` |
 | `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` | Only for a live AI model | Any service that uses the OpenAI chat format, such as Groq, OpenRouter, Gemini or Ollama. Without one, Pathy cannot chat and says so |
+| `DAILY_API_KEY` | For live video | From the Daily dashboard (Developers). Server only, never sent to the browser. Daily needs a payment method on the account before calls work, even on the free tier (10,000 minutes a month) |
 | `CRON_SECRET` | Only when deployed | Lets a scheduler call `/api/cron/opportunities` to read the opportunity feeds |
 | `RESEND_API_KEY`, `EMAIL_FROM` | For email | Resend sends password-reset emails. Without a key, emails are printed in the terminal during development. Until a domain is verified in Resend, it only delivers to your own Resend address |
 | `APP_URL` | When deployed | The site's address, used in emailed links (for example `https://pathora.vercel.app`). Never taken from the request, so a link cannot be pointed at another site |
@@ -126,8 +127,8 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 ### Checking that it works
 
 ```bash
-npm run verify      # 279 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
-npm run verify:db   # 72 live checks: double booking, the bridge, saving results, cancelling, session outcomes, password resets, account deletion, access rules, research events, opportunities, reports
+npm run verify      # 288 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
+npm run verify:db   # 80 live checks: double booking, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
@@ -280,7 +281,7 @@ Steps:
 4. In the Vercel project settings, add the environment variables: `MONGODB_URI`, `AUTH_SECRET`, the Google keys if used, and the `AI_*` variables if a live AI model is used.
 5. Deploy. Every later push to `main` redeploys automatically.
 
-Also add `AUTH_SECRET` (and the Google keys, if used) in Vercel. For Google sign-in, add the deployed address's callback, `https://<your-domain>/api/auth/callback/google`, to the Google client's authorised redirect URIs. Live video is planned with Whereby, with one room per booking.
+Also add `AUTH_SECRET` (and the Google keys, if used) in Vercel. For Google sign-in, add the deployed address's callback, `https://<your-domain>/api/auth/callback/google`, to the Google client's authorised redirect URIs. Also add `DAILY_API_KEY` for live video.
 
 ## Video demo
 

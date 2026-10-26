@@ -92,8 +92,8 @@ export default async function OverviewPage() {
           body: null,
           time: next.startsAt,
           waiting: next.status === 'pending' ? `Waiting for ${next.mentor.displayName.split(' ')[0]} to confirm` : null,
-          href: '/sessions',
-          cta: 'View sessions',
+          href: next.status === 'confirmed' ? `/session/${next.id}` : '/sessions',
+          cta: next.status === 'confirmed' ? 'Session room' : 'View sessions',
         }
       : {
           eyebrow: 'Next step',

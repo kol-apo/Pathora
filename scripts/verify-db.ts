@@ -24,11 +24,13 @@ import {
   Opportunity,
   PasswordReset,
   StudentProfile,
+  VideoSession,
   User,
 } from '../lib/db/models';
 import { cancelBookingForStudent, createBooking } from '../lib/db/queries/bookings';
 import { requestPasswordReset, resetPassword } from '../lib/db/queries/passwords';
 import { deleteAccount } from '../lib/db/queries/accountDeletion';
+import { joinVideoSession, syncVideoSession } from '../lib/db/queries/video';
 import { getSessionState, verifyCredentials } from '../lib/db/queries/accounts';
 import bcrypt from 'bcryptjs';
 import { previewBridge, saveDiscoveryResult } from '../lib/db/queries/discovery';
@@ -561,6 +563,56 @@ async function main() {
     } catch (err) {
       ok('an outcome cannot be changed once recorded', err instanceof DataError && err.code === 'INVALID_TRANSITION');
     }
+
+    console.log('\n── Video sessions ─────────────────────────────────────────');
+    // A stand-in for Daily: no real rooms are created by the test run.
+    const roomsMade: string[] = [];
+    const tokens: { user: string; owner: boolean }[] = [];
+    let fakeMeetings: { startTime: Date; durationSeconds: number; participants: number }[] = [];
+    const fakeDaily = {
+      async ensureRoom(name: string) {
+        if (!roomsMade.includes(name)) roomsMade.push(name);
+        return { name, url: `https://pathora.daily.co/${name}` };
+      },
+      async createToken(_room: string, user: string, owner: boolean) {
+        tokens.push({ user, owner });
+        return `token-for-${user}`;
+      },
+      async meetings() {
+        return fakeMeetings;
+      },
+      async deleteRoom() {},
+    };
+    const soon = new Date(Date.now() + 5 * 60_000);
+    const [callBooking, laterBooking] = await Booking.create([
+      { student: students[1]._id, mentor: mentor._id, topic: 'Video test', startsAt: soon, endsAt: new Date(soon.getTime() + 45 * 60_000), status: 'confirmed' },
+      { student: students[1]._id, mentor: mentor._id, topic: 'Video later', startsAt: new Date(Date.now() + 3 * 86_400_000), endsAt: new Date(Date.now() + 3 * 86_400_000 + 45 * 60_000), status: 'confirmed' },
+    ]);
+    try {
+      await joinVideoSession(String(callBooking._id), String(students[2]._id), { client: fakeDaily });
+      ok("someone else cannot join another person's session", false, 'it succeeded');
+    } catch (err) {
+      ok("someone else cannot join another person's session (same 404 as a missing one)", err instanceof DataError && err.code === 'BOOKING_NOT_FOUND');
+    }
+    try {
+      await joinVideoSession(String(laterBooking._id), String(students[1]._id), { client: fakeDaily });
+      ok('the call cannot be joined before it opens', false, 'it succeeded');
+    } catch (err) {
+      ok('the call cannot be joined before it opens', err instanceof DataError && err.code === 'SESSION_NOT_OPEN');
+    }
+    const studentJoin = await joinVideoSession(String(callBooking._id), String(students[1]._id), { client: fakeDaily });
+    const mentorJoin = await joinVideoSession(String(callBooking._id), String(mentorUser._id), { client: fakeDaily });
+    ok('the student and the mentor get the same room', studentJoin.roomUrl === mentorJoin.roomUrl && roomsMade.length === 1);
+    ok('each gets their own pass, and only the mentor hosts', tokens.length === 2 && tokens.some((t) => t.owner) && tokens.some((t) => !t.owner));
+    ok('the mentor sees only the student\'s first name', tokens.some((t) => !t.owner && t.user === 'Test'));
+    const vs = await VideoSession.findOne({ booking: callBooking._id }).lean();
+    ok('both joins are recorded', !!vs?.studentJoinedAt && !!vs?.mentorJoinedAt);
+    const meetingStart = new Date(Date.now() - 60_000);
+    fakeMeetings = [{ startTime: meetingStart, durationSeconds: 2520, participants: 2 }];
+    const synced = await syncVideoSession(String(callBooking._id), String(students[1]._id), { client: fakeDaily });
+    ok("the call's length comes from Daily's own records", synced.status === 'ended' && synced.durationSeconds === 2520);
+    ok('the session-completion report counts the ended call', (await sessionCompletion()).sessionsEnded >= 1);
+    await VideoSession.deleteMany({ booking: { $in: [callBooking._id, laterBooking._id] } });
 
     console.log('\n── Password reset ─────────────────────────────────────────');
     const resetUser = await User.create({

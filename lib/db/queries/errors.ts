@@ -24,6 +24,8 @@ export type DataErrorCode =
   | 'BRIDGE_NOT_SURFACED'
   | 'SESSION_STARTED'
   | 'SESSION_NOT_STARTED'
+  | 'SESSION_NOT_OPEN'
+  | 'VIDEO_UNAVAILABLE'
   | 'EMAIL_TAKEN'
   | 'ACCOUNT_EXISTS'
   | 'NOT_A_STUDENT'
@@ -75,6 +77,9 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   SESSION_STARTED: 409,
   // A session's outcome can only be recorded once it has started.
   SESSION_NOT_STARTED: 409,
+  // The video room is open only from 10 minutes before to 15 minutes after.
+  SESSION_NOT_OPEN: 409,
+  VIDEO_UNAVAILABLE: 503,
   EMAIL_TAKEN: 409,
   // A Google sign-in for an email that already has a password account.
   ACCOUNT_EXISTS: 409,

@@ -110,7 +110,7 @@ Indexes: `{ participantCode, occurredAt }`; `{ eventType, occurredAt }`.
 
 ### `VideoSession`
 
-One per booking (`booking` is unique). It holds the room link, when each party joined, start and end times, and `durationSeconds`, which is derived from start and end. There is no recording field anywhere in the data model: the consent form states that sessions are not recorded. Unknown fields are refused outright.
+One per booking (`booking` is unique), created the first time someone joins. It holds the Daily room's name and link, when each party first joined, start and end times, and `durationSeconds`, which is derived from start and end. Start and end come from Daily's own meeting records (the first and last meeting both people were in), not from the browser, so they cannot be faked. Joining is only possible for the booking's student and mentor, for a confirmed booking, from 10 minutes before the start to 15 minutes after the end ([`lib/db/queries/video.ts`](../lib/db/queries/video.ts)); each gets their own short-lived meeting pass, and only the mentor is the room's owner. There is no recording field anywhere in the data model: the consent form states that sessions are not recorded. Unknown fields are refused outright.
 
 ### `User`, `Availability`, `Opportunity`
 

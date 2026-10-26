@@ -33,6 +33,7 @@ import { Opportunity } from '../lib/db/models';
 import { textToHtml } from '../lib/email/send';
 import { appUrl } from '../lib/appUrl';
 import { PasswordSchema } from '../lib/auth/password';
+import { roomNameFor, roomProperties, sessionWindow, tokenProperties } from '../lib/video/daily';
 import { bioFor, JOINTHUB_MENTORS } from './data/jointhub-mentors';
 import { join } from 'node:path';
 import {
@@ -1005,6 +1006,7 @@ async function researchTests() {
   );
   const session = new VideoSession({
     booking: new mongoose.Types.ObjectId(),
+    roomName: 'pathora-test',
     roomUrl: 'https://example.invalid/room',
     roomExpiresAt: new Date('2026-12-01T10:00:00Z'),
     startedAt: new Date('2026-12-01T09:00:00Z'),
@@ -1337,6 +1339,32 @@ async function accountRecoveryTests() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Video rooms (Daily)
+// ═══════════════════════════════════════════════════════════════════════════
+async function videoTests() {
+  section('Video rooms');
+  const start = new Date('2026-11-02T10:00:00Z');
+  const end = new Date('2026-11-02T10:45:00Z');
+  const win = sessionWindow(start, end);
+  eq('the room opens 10 minutes before the start', win.opensAt.toISOString(), '2026-11-02T09:50:00.000Z');
+  eq('and closes 15 minutes after the end', win.closesAt.toISOString(), '2026-11-02T11:00:00.000Z');
+  const props = roomProperties(win);
+  ok('Daily is told the same window, and to remove everyone when it closes', props.nbf === Math.floor(win.opensAt.getTime() / 1000) && props.exp === Math.floor(win.closesAt.getTime() / 1000) && props.eject_at_room_exp === true);
+  eq('two people at most', props.max_participants, 2);
+  ok('no recording setting is ever sent', !Object.keys(props).some((k) => /record/i.test(k)));
+  ok('only the mentor hosts', tokenProperties('r', 'Kofi', true, win).is_owner && !tokenProperties('r', 'Ada', false, win).is_owner);
+  ok('a pass stops working when the room closes', tokenProperties('r', 'Ada', false, win).exp === props.exp);
+  eq('one room per booking, found again by name', roomNameFor('abc123'), 'pathora-abc123');
+  let refused = false;
+  try {
+    new VideoSession({ booking: new mongoose.Types.ObjectId(), roomName: 'r', roomUrl: 'https://x', roomExpiresAt: new Date(), recordingUrl: 'x' } as never);
+  } catch {
+    refused = true;
+  }
+  ok('the database refuses any recording field on a video session', refused);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   await timezoneTests();
   await slotTests();
@@ -1349,6 +1377,7 @@ async function main() {
   await partnerTests();
   await opportunityTests();
   await accountRecoveryTests();
+  await videoTests();
 
   console.log(`\n${'═'.repeat(62)}`);
   console.log(failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${passed} passed, ${failed} FAILED`);

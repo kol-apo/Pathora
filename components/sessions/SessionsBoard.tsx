@@ -37,6 +37,10 @@ function statusOf(s: Session, now: Date): { label: string; tone: 'ok' | 'wait' |
   }
 }
 
+/** The video room is open from 10 minutes before the start until 15 minutes after the end. */
+const opensSoon = (s: Session, now: Date) =>
+  now.getTime() >= Date.parse(s.startsAt) - 10 * 60_000 && now.getTime() <= Date.parse(s.endsAt) + 15 * 60_000;
+
 const toneClass = {
   ok: 'bg-available/10 text-available',
   wait: 'bg-sky-soft text-navy',
@@ -76,6 +80,18 @@ function SessionRow({ s, now, past = false }: { s: Session; now: Date; past?: bo
         <span className={`rounded-full px-2.5 py-1 text-[12px] font-medium ${toneClass[status.tone]}`}>
           {status.label}
         </span>
+        {!past && s.status === 'confirmed' && (
+          <Link
+            href={`/session/${s.id}`}
+            className={
+              opensSoon(s, now)
+                ? 'rounded bg-navy px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-navy-deep'
+                : 'rounded border border-line px-3.5 py-2 text-[13px] font-medium text-ink transition-colors hover:bg-surface'
+            }
+          >
+            {opensSoon(s, now) ? 'Join' : 'Session room'}
+          </Link>
+        )}
         {canCancel && (
           <CancelBookingButton bookingId={s.id} mentorFirstName={s.mentor.displayName.split(' ')[0]} />
         )}
@@ -146,7 +162,7 @@ export default function SessionsBoard({ bookings }: { bookings: Session[] }) {
 
       <Group
         title="Today"
-        hint={todays.length ? 'Live video is coming soon. Your mentor will tell you how to meet.' : undefined}
+        hint={todays.length ? 'The call opens 10 minutes before each session.' : undefined}
       >
         {todays.length ? (
           todays.map((s) => <SessionRow key={s.id} s={s} now={now} />)

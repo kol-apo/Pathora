@@ -12,6 +12,8 @@ export type SessionStatus = 'provisioned' | 'in_progress' | 'ended' | 'expired';
 export interface IVideoSession {
   _id: Types.ObjectId;
   booking: Types.ObjectId;
+  /** The Daily room's name, "pathora-<booking id>". */
+  roomName: string;
   roomUrl: string;
   roomExpiresAt: Date;
   status: SessionStatus;
@@ -28,6 +30,7 @@ export interface IVideoSession {
 const VideoSessionSchema = new Schema<IVideoSession>(
   {
     booking: { type: Schema.Types.ObjectId, ref: 'Booking', required: true, unique: true },
+    roomName: { type: String, required: true },
     roomUrl: { type: String, required: true },
     roomExpiresAt: { type: Date, required: true },
     status: {

@@ -130,12 +130,18 @@ export default async function MentorHomePage() {
             {confirmed.map((b) => (
               <li key={b.id} className="flex items-center gap-3 px-5 py-4">
                 <CalendarDays size={18} className="shrink-0 text-navy" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-medium text-ink">
                     {b.studentName} · {when(b.startsAt, me.timezone)}
                   </p>
                   <p className="text-[13.5px] text-muted">{b.topic}</p>
                 </div>
+                <Link
+                  href={`/session/${b.id}`}
+                  className="shrink-0 rounded border border-line px-3.5 py-2 text-[13px] font-medium text-ink transition-colors hover:bg-surface"
+                >
+                  Session room
+                </Link>
               </li>
             ))}
           </ul>
