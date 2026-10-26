@@ -6,20 +6,30 @@ import { DataError, statusForError } from '@/lib/db/queries/errors';
 
 export const dynamic = 'force-dynamic';
 
+const Minute = z.number().int().min(0).max(1440);
+
 const AvailabilitySchema = z.object({
   acceptingBookings: z.boolean(),
   weekly: z
+    .array(z.object({ dayOfWeek: z.number().int().min(0).max(6), startMinute: Minute, endMinute: Minute }))
+    .max(28),
+  // Specific calendar dates: a day off, or that day's own hours.
+  dates: z
     .array(
       z.object({
-        dayOfWeek: z.number().int().min(0).max(6),
-        startMinute: z.number().int().min(0).max(1440),
-        endMinute: z.number().int().min(0).max(1440),
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        blocked: z.boolean(),
+        windows: z.array(z.object({ startMinute: Minute, endMinute: Minute })).max(4),
       }),
     )
-    .max(28),
+    .max(120)
+    .optional(),
 });
 
-/** PUT /api/mentor/availability  Replace the signed-in mentor's weekly hours. */
+/**
+ * PUT /api/mentor/availability  Replace the signed-in mentor's weekly hours
+ * and, when `dates` is sent, their date-specific hours.
+ */
 export async function PUT(request: Request) {
   const guard = await requireRole('mentor');
   if ('response' in guard) return guard.response;

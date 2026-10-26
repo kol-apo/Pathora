@@ -29,7 +29,7 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
 | Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. |
-| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (288 checks) and `npm run verify:db` (80 checks) pass. |
+| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (288 checks) and `npm run verify:db` (93 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. "Forgot your password?" emails a link that works once, for an hour; resetting signs the account out everywhere. The Account page lets students withdraw from the study, which deletes the account and everything recorded about them, research events included. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
@@ -128,7 +128,7 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 
 ```bash
 npm run verify      # 288 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
-npm run verify:db   # 80 live checks: double booking, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
+npm run verify:db   # 93 live checks: double booking, date-specific hours, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
@@ -206,7 +206,7 @@ The full landing page is in [docs/screenshots/02-landing-full.png](docs/screensh
 
 ![Mentor application](docs/screenshots/16-mentor-application.png)
 
-**Weekly hours**
+**Weekly hours and specific dates**
 
 ![Mentor availability](docs/screenshots/17-mentor-availability.png)
 
@@ -255,7 +255,7 @@ erDiagram
 
 ### How booking works in the application
 
-**Open slots are calculated, not stored.** A consultant's availability is saved as weekly rules in their own timezone, for example "Monday, Wednesday and Friday, 09:00 to 12:00 and 14:00 to 17:00, Africa/Lagos". When a student opens the booking card, `lib/booking/slots.ts` walks the coming days, cuts each window into 45-minute sessions with a 15-minute gap, converts each time to UTC and removes anything that is too soon, too far ahead or already booked. The browser then shows each time in the student's own timezone.
+**Open slots are calculated, not stored.** A consultant's availability is saved as weekly rules in their own timezone, for example "Monday, Wednesday and Friday, 09:00 to 12:00 and 14:00 to 17:00, Africa/Lagos", plus any specific dates that differ: a day off, or different hours for that one date, which replace the weekly hours for that day. When a student opens the booking card, `lib/booking/slots.ts` walks the coming days, cuts each window into 45-minute sessions with a 15-minute gap, converts each time to UTC and removes anything that is too soon, too far ahead or already booked. The browser then shows each time in the student's own timezone.
 
 **Double-booking is blocked twice.**
 
@@ -300,7 +300,7 @@ app/                        Pages and API routes (Next.js App Router)
   signin/, signup/          Sign-in and sign-up
   welcome/                  Research consent, shown once after sign-up
   become-a-mentor/          Mentor application
-  mentor/                   Mentor console: sessions and weekly hours
+  mentor/                   Mentor console: sessions, weekly hours and specific dates
   admin/                    Admin console: overview, research reports, mentor review
   api/
     discovery/              POST   run the discovery agent on a set of answers
@@ -311,7 +311,7 @@ app/                        Pages and API routes (Next.js App Router)
     auth/[...nextauth]/     Auth.js sign-in, sign-out and session
     register/               POST   create a student account
     consent/                POST   record research consent
-    mentor/                 POST   apply; PUT weekly hours; POST confirm or decline a booking
+    mentor/                 POST   apply; PUT weekly hours and specific dates; POST confirm or decline a booking
     admin/mentors/[id]/     POST   approve, reject, suspend or reinstate a mentor
 components/                 Interface components
   auth/                     Sign-in, sign-up and consent forms

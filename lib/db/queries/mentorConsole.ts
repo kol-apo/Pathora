@@ -3,7 +3,7 @@ import dbConnect from '../connect';
 import { Availability, Booking, MentorProfile, User } from '../models';
 import type { MentorStatus } from '../models/MentorProfile';
 import type { BookingStatus } from '../models/Booking';
-import { isValidTimeZone } from '@/lib/booking/timezone';
+import { addDays, formatZonedDate, isValidTimeZone } from '@/lib/booking/timezone';
 import { SECTORS, type Sector } from '@/lib/types';
 import { initialsFor } from './accounts';
 import { setBookingStatus } from './bookings';
@@ -108,28 +108,87 @@ export interface WeeklyWindow {
   endMinute: number;
 }
 
-export async function getMyAvailability(
-  userId: string,
-): Promise<{ weekly: WeeklyWindow[]; acceptingBookings: boolean; timezone: string } | null> {
+export interface TimeWindow {
+  startMinute: number;
+  endMinute: number;
+}
+
+/**
+ * One calendar date that differs from the weekly hours: either a day off
+ * (`blocked`) or its own hours, which replace that weekday's hours.
+ */
+export interface DateHours {
+  /** "YYYY-MM-DD" in the mentor's timezone. */
+  date: string;
+  blocked: boolean;
+  windows: TimeWindow[];
+}
+
+/** How far ahead a mentor can set hours for a single date. */
+export const DATE_HOURS_MAX_DAYS_AHEAD = 365;
+
+export async function getMyAvailability(userId: string): Promise<{
+  weekly: WeeklyWindow[];
+  dates: DateHours[];
+  acceptingBookings: boolean;
+  timezone: string;
+} | null> {
   await dbConnect();
   const m = await MentorProfile.findOne({ user: userId }).lean();
   if (!m) return null;
   const rules = await Availability.findOne({ mentor: m._id }).lean();
+  const today = formatZonedDate(new Date(), m.timezone);
   return {
     weekly: (rules?.weekly ?? []).map((w) => ({
       dayOfWeek: w.dayOfWeek,
       startMinute: w.startMinute,
       endMinute: w.endMinute,
     })),
+    // Dates already gone are of no use to the mentor, so only today onwards.
+    dates: (rules?.exceptions ?? [])
+      .filter((e) => e.date >= today)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((e) => ({
+        date: e.date,
+        blocked: e.blocked,
+        windows: e.blocked ? [] : e.windows.map((w) => ({ startMinute: w.startMinute, endMinute: w.endMinute })),
+      })),
     acceptingBookings: m.acceptingBookings !== false,
     timezone: m.timezone,
   };
 }
 
-/** Replace the mentor's weekly hours. Windows may not overlap on the same day. */
+const BAD_WINDOW = 'Each window must be at least 45 minutes, within one day.';
+
+function isValidWindow(w: TimeWindow): boolean {
+  return (
+    Number.isInteger(w.startMinute) &&
+    Number.isInteger(w.endMinute) &&
+    w.startMinute >= 0 &&
+    w.endMinute <= 1440 &&
+    w.endMinute - w.startMinute >= 45
+  );
+}
+
+function hasOverlap(windows: TimeWindow[]): boolean {
+  const sorted = [...windows].sort((a, b) => a.startMinute - b.startMinute);
+  return sorted.some((w, i) => i > 0 && w.startMinute < sorted[i - 1].endMinute);
+}
+
+/** A real calendar date written as YYYY-MM-DD (rejects 2026-02-30). */
+function isCalendarDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  return addDays(s, 0) === s;
+}
+
+/**
+ * Replace the mentor's weekly hours and their date-specific hours. Windows may
+ * not overlap on the same day. Dates already past are dropped, not rejected:
+ * a page left open overnight should still save.
+ */
 export async function updateMyAvailability(
   userId: string,
-  input: { weekly: WeeklyWindow[]; acceptingBookings: boolean },
+  input: { weekly: WeeklyWindow[]; dates?: DateHours[]; acceptingBookings: boolean },
 ): Promise<void> {
   await dbConnect();
   const m = await MentorProfile.findOne({ user: userId });
@@ -137,32 +196,51 @@ export async function updateMyAvailability(
 
   const byDay = new Map<number, WeeklyWindow[]>();
   for (const w of input.weekly) {
-    const valid =
-      Number.isInteger(w.dayOfWeek) &&
-      w.dayOfWeek >= 0 &&
-      w.dayOfWeek <= 6 &&
-      Number.isInteger(w.startMinute) &&
-      Number.isInteger(w.endMinute) &&
-      w.startMinute >= 0 &&
-      w.endMinute <= 1440 &&
-      w.endMinute - w.startMinute >= 45;
-    if (!valid) {
-      throw new DataError('INVALID_AVAILABILITY', 'Each window must be at least 45 minutes, within one day.');
-    }
+    const valid = Number.isInteger(w.dayOfWeek) && w.dayOfWeek >= 0 && w.dayOfWeek <= 6 && isValidWindow(w);
+    if (!valid) throw new DataError('INVALID_AVAILABILITY', BAD_WINDOW);
     byDay.set(w.dayOfWeek, [...(byDay.get(w.dayOfWeek) ?? []), w]);
   }
   for (const windows of byDay.values()) {
-    const sorted = [...windows].sort((a, b) => a.startMinute - b.startMinute);
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].startMinute < sorted[i - 1].endMinute) {
-        throw new DataError('INVALID_AVAILABILITY', 'Two windows on the same day overlap.');
-      }
-    }
+    if (hasOverlap(windows)) throw new DataError('INVALID_AVAILABILITY', 'Two windows on the same day overlap.');
   }
 
+  const today = formatZonedDate(new Date(), m.timezone);
+  const lastDay = addDays(today, DATE_HOURS_MAX_DAYS_AHEAD);
+  const seen = new Set<string>();
+  const exceptions: DateHours[] = [];
+  for (const d of input.dates ?? []) {
+    if (!isCalendarDate(d.date)) throw new DataError('INVALID_AVAILABILITY', 'Choose a valid date.');
+    if (seen.has(d.date)) throw new DataError('INVALID_AVAILABILITY', `${d.date} is listed twice.`);
+    seen.add(d.date);
+    if (d.date < today) continue;
+    if (d.date > lastDay) {
+      throw new DataError('INVALID_AVAILABILITY', 'Dates can be set up to a year ahead.');
+    }
+    if (d.blocked) {
+      exceptions.push({ date: d.date, blocked: true, windows: [] });
+      continue;
+    }
+    if (d.windows.length === 0) {
+      throw new DataError('INVALID_AVAILABILITY', `Add hours for ${d.date}, or mark it as a day off.`);
+    }
+    if (!d.windows.every(isValidWindow)) throw new DataError('INVALID_AVAILABILITY', BAD_WINDOW);
+    if (hasOverlap(d.windows)) {
+      throw new DataError('INVALID_AVAILABILITY', `Two windows on ${d.date} overlap.`);
+    }
+    exceptions.push({
+      date: d.date,
+      blocked: false,
+      windows: d.windows.map((w) => ({ startMinute: w.startMinute, endMinute: w.endMinute })),
+    });
+  }
+  exceptions.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Without `dates`, an older client is saving weekly hours only: keep its dates.
+  const $set: Record<string, unknown> = { weekly: input.weekly };
+  if (input.dates) $set.exceptions = exceptions;
   await Availability.findOneAndUpdate(
     { mentor: m._id },
-    { $set: { weekly: input.weekly } },
+    { $set },
     { upsert: true, runValidators: true, setDefaultsOnInsert: true },
   );
   m.acceptingBookings = input.acceptingBookings;

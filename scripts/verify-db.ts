@@ -40,7 +40,13 @@ import { listAvailableSlots } from '../lib/db/queries/mentors';
 import { bridgeEligible, surfaceBridgeConsultants } from '../lib/db/queries/bridge';
 import { getDiscoveryResultForMentor, getDiscoveryResultForStudent } from '../lib/db/queries/access';
 import { bridgeFunnel, countStudentEvents, logEvent, logStudentEvent, sessionCompletion } from '../lib/db/queries/research';
-import { listMyPastSessions, respondToBooking } from '../lib/db/queries/mentorConsole';
+import {
+  getMyAvailability,
+  listMyPastSessions,
+  respondToBooking,
+  updateMyAvailability,
+} from '../lib/db/queries/mentorConsole';
+import { addDays, formatZonedDate } from '../lib/booking/timezone';
 import { addOpportunity, hideOpportunity, listOpportunities, refreshOpportunities } from '../lib/db/queries/opportunities';
 import { BRIDGE_SIZE, rankCandidates } from '../lib/matching/similarity';
 import { SECTORS } from '../lib/types';
@@ -701,6 +707,96 @@ async function main() {
     ok('the bookings are gone, freeing the slot', left.bookings === 0 && (await listAvailableSlots(String(mentor._id))).some((sl) => sl.startsAt === leaverSlot.startsAt));
     ok('the research events under their code are gone', left.events === 0);
     ok('their session ends on the next request', (await getSessionState(String(leaver._id))) === null);
+
+    console.log('\n── Specific dates in a mentor\'s hours ────────────────────');
+    // A mentor of its own, so the shared fixture's hours stay as they were.
+    const datesUser = await User.create({ name: 'Dates Mentor', email: `dates.${RUN}@pathora.test`, role: 'mentor' });
+    const datesMentor = await MentorProfile.create({
+      user: datesUser._id,
+      displayName: `Dates Mentor ${RUN}`,
+      initials: 'DM',
+      role: 'Tester',
+      company: 'Pathora',
+      sector: 'Technology',
+      experience: 3,
+      bio: 'Fixture.',
+      timezone: 'Africa/Lagos',
+      status: 'approved',
+      approvedBy: adminUser._id,
+      approvedAt: new Date(),
+    });
+    await Availability.create({ mentor: datesMentor._id, weekly: [], horizonDays: 30, leadTimeHours: 24 });
+    try {
+      const uid = String(datesUser._id);
+      const tz = 'Africa/Lagos';
+      const today = formatZonedDate(new Date(), tz);
+      const dowOf = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
+      // The first Monday at least a week away, then that week's Tuesday and Saturday.
+      let monday = addDays(today, 7);
+      while (dowOf(monday) !== 1) monday = addDays(monday, 1);
+      const tuesday = addDays(monday, 1);
+      const saturday = addDays(monday, 5);
+      const weekdays = [1, 2, 3, 4, 5].map((dayOfWeek) => ({ dayOfWeek, startMinute: 540, endMinute: 1020 }));
+
+      await updateMyAvailability(uid, {
+        acceptingBookings: true,
+        weekly: weekdays,
+        dates: [
+          { date: saturday, blocked: false, windows: [{ startMinute: 600, endMinute: 720 }] },
+          { date: monday, blocked: false, windows: [{ startMinute: 780, endMinute: 900 }] },
+          { date: tuesday, blocked: true, windows: [] },
+          { date: addDays(today, -3), blocked: true, windows: [] },
+        ],
+      });
+      const slots = await listAvailableSlots(String(datesMentor._id));
+      const localTimes = (date: string) =>
+        slots
+          .filter((sl) => formatZonedDate(new Date(sl.startsAt), tz) === date)
+          .map((sl) =>
+            new Date(sl.startsAt).toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
+          );
+      ok("a date's own hours replace that weekday's hours", localTimes(monday).join(',') === '13:00,14:00', localTimes(monday).join(','));
+      ok('a day off offers no slots', localTimes(tuesday).length === 0);
+      ok('a usually free weekend date can be opened', localTimes(saturday).join(',') === '10:00,11:00', localTimes(saturday).join(','));
+      ok('other weekdays keep their weekly hours', localTimes(addDays(monday, 2)).length === 8);
+
+      const mine = await getMyAvailability(uid);
+      ok(
+        'the mentor gets the dates back in order, without the past one',
+        mine?.dates.map((d) => d.date).join(',') === [monday, tuesday, saturday].join(','),
+        mine?.dates.map((d) => d.date).join(','),
+      );
+
+      await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays });
+      ok('saving weekly hours alone keeps the dates', (await getMyAvailability(uid))?.dates.length === 3);
+
+      const refused = async (dates: { date: string; blocked: boolean; windows: { startMinute: number; endMinute: number }[] }[]) => {
+        try {
+          await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, dates });
+          return false;
+        } catch (err) {
+          return err instanceof DataError && err.code === 'INVALID_AVAILABILITY';
+        }
+      };
+      ok('overlapping hours on one date are refused', await refused([{ date: monday, blocked: false, windows: [{ startMinute: 600, endMinute: 720 }, { startMinute: 690, endMinute: 780 }] }]));
+      ok('the same date twice is refused', await refused([{ date: monday, blocked: true, windows: [] }, { date: monday, blocked: true, windows: [] }]));
+      ok('an available date with no hours is refused', await refused([{ date: monday, blocked: false, windows: [] }]));
+      ok('a date that does not exist is refused', await refused([{ date: '2027-02-30', blocked: true, windows: [] }]));
+      ok('a date more than a year ahead is refused', await refused([{ date: addDays(today, 400), blocked: true, windows: [] }]));
+      ok('a refused save changes nothing', (await getMyAvailability(uid))?.dates.length === 3);
+
+      await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, dates: [] });
+      const tuesdayAgain = (await listAvailableSlots(String(datesMentor._id))).filter(
+        (sl) => formatZonedDate(new Date(sl.startsAt), tz) === tuesday,
+      );
+      ok(
+        'removing every date returns to weekly hours',
+        (await getMyAvailability(uid))?.dates.length === 0 && tuesdayAgain.length === 8,
+      );
+    } finally {
+      await Availability.deleteMany({ mentor: datesMentor._id });
+      await MentorProfile.deleteMany({ _id: datesMentor._id });
+    }
 
     console.log('\n── Opportunities ──────────────────────────────────────────');
     const feedXml = `<rss><channel>
