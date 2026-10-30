@@ -39,6 +39,41 @@ const DEFAULT_HOURS = Array.from({ length: 16 }, (_, i) => 360 + i * 60);
 const WORKDAY = [540, 600, 660, 720, 780, 840, 900, 960]; // 09:00-17:00
 const MAX_DAYS_AHEAD = 365;
 
+/** Must match NOTICE_HOURS in lib/db/queries/mentorConsole.ts. */
+const NOTICE_OPTIONS = [
+  { hours: 0.5, label: '30 minutes' },
+  { hours: 1, label: '1 hour' },
+  { hours: 3, label: '3 hours' },
+  { hours: 12, label: '12 hours' },
+  { hours: 24, label: '1 day' },
+  { hours: 48, label: '2 days' },
+];
+const noticeLabel = (h: number) =>
+  NOTICE_OPTIONS.find((o) => o.hours === h)?.label ?? (h % 24 === 0 ? `${h / 24} days` : `${h} hours`);
+/** "1 day's notice", "2 days' notice". */
+const noticeOf = (h: number) => {
+  const l = noticeLabel(h);
+  return `${l}${l.endsWith('s') ? "'" : "'s"} notice`;
+};
+
+/** The local date and minute-of-day of an instant in a timezone. */
+function zonedNow(instant: Date, timeZone: string): { date: string; minute: number } {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(instant)
+      .map((p) => [p.type, p.value]),
+  );
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, minute: Number(parts.hour) * 60 + Number(parts.minute) };
+}
+
 const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 const toUTC = (iso: string) => {
@@ -73,6 +108,10 @@ export default function AvailabilityEditor({
   initialAccepting,
   timezone,
   today,
+  initialNoticeHours,
+  horizonDays,
+  status,
+  nextSlotLabel,
 }: {
   initial: WeeklyWindow[];
   initialDates: DateHours[];
@@ -80,6 +119,11 @@ export default function AvailabilityEditor({
   timezone: string;
   /** Today in the mentor's timezone, YYYY-MM-DD. */
   today: string;
+  initialNoticeHours: number;
+  horizonDays: number;
+  status: 'pending_review' | 'approved' | 'rejected' | 'suspended';
+  /** The first time students can book now (saved state), already formatted. */
+  nextSlotLabel: string | null;
 }) {
   const router = useRouter();
   const [week, setWeek] = useState(() => weekFromWindows(initial));
@@ -89,6 +133,7 @@ export default function AvailabilityEditor({
     ),
   );
   const [accepting, setAccepting] = useState(initialAccepting);
+  const [notice, setNotice] = useState(initialNoticeHours);
   const [selected, setSelected] = useState<string | null>(null);
   const [month, setMonth] = useState(today.slice(0, 7)); // YYYY-MM
   const [busy, setBusy] = useState(false);
@@ -103,8 +148,9 @@ export default function AvailabilityEditor({
     return [...new Set([...DEFAULT_HOURS, ...saved])].sort((a, b) => a - b);
   }, [initial, initialDates]);
 
-  const payload = (w: typeof week, o: typeof overrides, a: boolean) => ({
+  const payload = (w: typeof week, o: typeof overrides, a: boolean, n: number) => ({
     acceptingBookings: a,
+    noticeHours: n,
     weekly: DAYS.flatMap(({ dow }) => windowsFromStarts(w[dow]).map((x) => ({ dayOfWeek: dow, ...x }))),
     dates: Object.entries(o)
       .filter(([date]) => date >= today)
@@ -112,9 +158,9 @@ export default function AvailabilityEditor({
       .map(([date, x]) => ({ date, blocked: x.blocked, windows: x.blocked ? [] : windowsFromStarts(x.starts) })),
   });
   const [savedState, setSavedState] = useState(() =>
-    JSON.stringify(payload(weekFromWindows(initial), overrides, initialAccepting)),
+    JSON.stringify(payload(weekFromWindows(initial), overrides, initialAccepting, initialNoticeHours)),
   );
-  const current = JSON.stringify(payload(week, overrides, accepting));
+  const current = JSON.stringify(payload(week, overrides, accepting, notice));
   const dirty = current !== savedState;
 
   // Warn before leaving with unsaved changes.
@@ -206,6 +252,28 @@ export default function AvailabilityEditor({
     .filter(([date]) => date >= today)
     .sort(([a], [b]) => a.localeCompare(b));
 
+  // What students see, from the saved hours (the page reloads after a save).
+  const savedHasHours = initial.length > 0 || initialDates.some((d) => !d.blocked && d.windows.length > 0);
+  const bookable = status === 'approved' && initialAccepting && nextSlotLabel !== null;
+  const statusTitle = bookable
+    ? 'Students can book you'
+    : status === 'pending_review'
+      ? 'Waiting for approval'
+      : status !== 'approved'
+        ? 'Your profile is hidden from students'
+        : 'Students cannot book you yet';
+  const statusDetail = bookable
+    ? `The next time they can book is ${nextSlotLabel} (${timezone}).`
+    : status === 'pending_review'
+      ? 'An admin is reviewing your profile. Students will see your hours once it is approved.'
+      : status !== 'approved'
+        ? 'Contact the Pathora team if you think this is a mistake.'
+        : !initialAccepting
+          ? 'You have paused new bookings. Turn "Accepting new bookings" back on and save.'
+          : !savedHasHours
+            ? 'Add the hours you are free below, then save.'
+            : `None of your saved hours are open: each needs ${noticeOf(initialNoticeHours)}, and students can book up to ${horizonDays} days ahead. Add later hours or shorten the notice.`;
+
   const cellClass: Record<ReturnType<typeof stateOf>, string> = {
     open: 'bg-sky-soft text-navy font-medium',
     changed: 'bg-sky-soft text-navy font-medium',
@@ -215,18 +283,62 @@ export default function AvailabilityEditor({
 
   return (
     <div className="space-y-6">
-      <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-line p-5">
-        <span>
-          <span className="block text-[15px] font-semibold text-ink">Accepting new bookings</span>
-          <span className="text-[13.5px] text-muted">Turn this off to pause new requests without changing your hours.</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={accepting}
-          onChange={(e) => setAccepting(e.target.checked)}
-          className="h-5 w-5 shrink-0 accent-[#1D3F5A]"
-        />
-      </label>
+      {/* ── What students see right now ─────────────────────────────── */}
+      <section className="rounded-xl border border-line">
+        <div
+          role="status"
+          aria-label="Booking status"
+          className={`flex items-start gap-3 rounded-t-xl px-5 py-4 ${bookable ? 'bg-sky-soft' : 'bg-surface'}`}
+        >
+          <span
+            className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${bookable ? 'bg-available' : 'bg-faint'}`}
+            aria-hidden
+          />
+          <div>
+            <p className="text-[15px] font-semibold text-ink">{statusTitle}</p>
+            <p className="mt-0.5 text-[13.5px] text-muted">{statusDetail}</p>
+          </div>
+        </div>
+        <div className="divide-y divide-line border-t border-line">
+          <label className="flex cursor-pointer items-center justify-between gap-4 px-5 py-4">
+            <span>
+              <span className="block text-[14px] font-medium text-ink">Accepting new bookings</span>
+              <span className="text-[13px] text-muted">Turn this off to pause new requests without changing your hours.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={accepting}
+              onChange={(e) => setAccepting(e.target.checked)}
+              className="h-5 w-5 shrink-0 accent-[#1D3F5A]"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4 px-5 py-4">
+            <span>
+              <span className="block text-[14px] font-medium text-ink">Minimum notice</span>
+              <span className="text-[13px] text-muted">
+                How soon before a session students can still book it. You confirm each request.
+              </span>
+            </span>
+            <select
+              value={notice}
+              onChange={(e) => {
+                setMessage(null);
+                setNotice(Number(e.target.value));
+              }}
+              className="h-10 shrink-0 rounded border border-line bg-white px-3 text-[14px] text-ink focus:border-navy focus:outline-none"
+            >
+              {!NOTICE_OPTIONS.some((o) => o.hours === initialNoticeHours) && (
+                <option value={initialNoticeHours}>{noticeLabel(initialNoticeHours)}</option>
+              )}
+              {NOTICE_OPTIONS.map((o) => (
+                <option key={o.hours} value={o.hours}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </section>
 
       {/* ── 1. Usual week ─────────────────────────────────────────────── */}
       <section className="rounded-xl border border-line">
@@ -393,6 +505,9 @@ export default function AvailabilityEditor({
                 usual={usualFor(selected)}
                 starts={startsOn(selected)}
                 hours={hours}
+                timezone={timezone}
+                noticeHours={notice}
+                horizonDays={horizonDays}
                 onToggle={(m) => toggleDateHour(selected, m)}
                 onDayOff={() => setDate(selected, { blocked: true, starts: [] })}
                 onReset={() => setDate(selected, null)}
@@ -463,6 +578,9 @@ function DatePanel({
   usual,
   starts,
   hours,
+  timezone,
+  noticeHours,
+  horizonDays,
   onToggle,
   onDayOff,
   onReset,
@@ -472,6 +590,9 @@ function DatePanel({
   usual: number[];
   starts: number[];
   hours: number[];
+  timezone: string;
+  noticeHours: number;
+  horizonDays: number;
   onToggle: (m: number) => void;
   onDayOff: () => void;
   onReset: () => void;
@@ -484,6 +605,26 @@ function DatePanel({
     off: 'Day off. No sessions can be booked.',
   }[state];
 
+  // Hours too close to now for students to book, given the notice period.
+  const now = Date.now();
+  const earliest = zonedNow(new Date(now + noticeHours * 3_600_000), timezone);
+  const lastBookable = zonedNow(new Date(now + horizonDays * 86_400_000), timezone).date;
+  const tooSoon = (m: number) => date < earliest.date || (date === earliest.date && m < earliest.minute);
+  const tooSoonCount = starts.filter(tooSoon).length;
+  const hint =
+    state === 'off'
+      ? null
+      : hours.every(tooSoon)
+        ? `This date is too soon for new bookings: you ask for ${noticeOf(noticeHours)}.`
+        : tooSoonCount > 0
+          ? `Faded hours are too soon to book: you ask for ${noticeOf(noticeHours)}.`
+          : date > lastBookable
+            ? `Students can book up to ${horizonDays} days ahead, so this date opens for booking on ${label(
+                addDays(date, -horizonDays),
+                { weekday: 'long', day: 'numeric', month: 'long' },
+              )}.`
+            : null;
+
   return (
     <div>
       <h3 className="text-[15px] font-semibold text-ink">
@@ -495,14 +636,17 @@ function DatePanel({
         <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Hours on this date">
           {hours.map((m) => {
             const on = starts.includes(m);
+            const soon = tooSoon(m);
             return (
               <button
                 key={m}
                 aria-pressed={on}
+                aria-label={soon ? `${fmt(m)}, too soon to book` : fmt(m)}
+                title={soon ? 'Too soon to book' : undefined}
                 onClick={() => onToggle(m)}
                 className={`w-[62px] rounded py-1.5 text-[13px] tabular-nums transition-colors ${
                   on ? 'bg-navy font-medium text-white hover:bg-navy-deep' : 'bg-fill text-muted hover:bg-sky-muted hover:text-ink'
-                }`}
+                } ${soon ? 'opacity-40' : ''}`}
               >
                 {fmt(m)}
               </button>
@@ -510,6 +654,8 @@ function DatePanel({
           })}
         </div>
       )}
+
+      {hint && <p className="mt-3 text-[12.5px] text-muted">{hint}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {state !== 'off' && usual.length + starts.length > 0 && (

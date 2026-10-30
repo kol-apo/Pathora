@@ -7,6 +7,7 @@ import { addDays, formatZonedDate, isValidTimeZone } from '@/lib/booking/timezon
 import { SECTORS, type Sector } from '@/lib/types';
 import { initialsFor } from './accounts';
 import { setBookingStatus } from './bookings';
+import { listAvailableSlots } from './mentors';
 import { DataError } from './errors';
 import type { MentorLink, MentorSocials } from '@/lib/profileLinks';
 
@@ -127,12 +128,27 @@ export interface DateHours {
 /** How far ahead a mentor can set hours for a single date. */
 export const DATE_HOURS_MAX_DAYS_AHEAD = 365;
 
-export async function getMyAvailability(userId: string): Promise<{
+/**
+ * How much notice a mentor can ask for before a session, in hours. A request
+ * still has to be confirmed by the mentor, so very short notice suits mentors
+ * who check often (and testing).
+ */
+export const NOTICE_HOURS = [0.5, 1, 3, 12, 24, 48] as const;
+
+export interface MyAvailability {
   weekly: WeeklyWindow[];
   dates: DateHours[];
   acceptingBookings: boolean;
   timezone: string;
-} | null> {
+  noticeHours: number;
+  /** Students can book this many days ahead. */
+  horizonDays: number;
+  status: MentorStatus;
+  /** The first time a student can book right now, or null if none. */
+  nextSlotAt: string | null;
+}
+
+export async function getMyAvailability(userId: string): Promise<MyAvailability | null> {
   await dbConnect();
   const m = await MentorProfile.findOne({ user: userId }).lean();
   if (!m) return null;
@@ -155,6 +171,11 @@ export async function getMyAvailability(userId: string): Promise<{
       })),
     acceptingBookings: m.acceptingBookings !== false,
     timezone: m.timezone,
+    noticeHours: rules?.leadTimeHours ?? 24,
+    horizonDays: rules?.horizonDays ?? 30,
+    status: m.status ?? (m.vetted ? 'approved' : 'pending_review'),
+    // The same calculation students' booking cards use.
+    nextSlotAt: rules ? ((await listAvailableSlots(String(m._id)))[0]?.startsAt ?? null) : null,
   };
 }
 
@@ -188,7 +209,7 @@ function isCalendarDate(s: string): boolean {
  */
 export async function updateMyAvailability(
   userId: string,
-  input: { weekly: WeeklyWindow[]; dates?: DateHours[]; acceptingBookings: boolean },
+  input: { weekly: WeeklyWindow[]; dates?: DateHours[]; acceptingBookings: boolean; noticeHours?: number },
 ): Promise<void> {
   await dbConnect();
   const m = await MentorProfile.findOne({ user: userId });
@@ -238,6 +259,15 @@ export async function updateMyAvailability(
   // Without `dates`, an older client is saving weekly hours only: keep its dates.
   const $set: Record<string, unknown> = { weekly: input.weekly };
   if (input.dates) $set.exceptions = exceptions;
+  if (input.noticeHours !== undefined) {
+    const current = await Availability.findOne({ mentor: m._id }).select('leadTimeHours').lean();
+    const allowed = (NOTICE_HOURS as readonly number[]).includes(input.noticeHours);
+    // An existing value outside the list (set by a script) may be kept as it is.
+    if (!allowed && input.noticeHours !== current?.leadTimeHours) {
+      throw new DataError('INVALID_AVAILABILITY', 'Choose a notice period from the list.');
+    }
+    $set.leadTimeHours = input.noticeHours;
+  }
   await Availability.findOneAndUpdate(
     { mentor: m._id },
     { $set },

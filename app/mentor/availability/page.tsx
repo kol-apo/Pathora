@@ -27,6 +27,22 @@ export default async function MentorAvailabilityPage() {
         initialAccepting={availability.acceptingBookings}
         timezone={availability.timezone}
         today={formatZonedDate(new Date(), availability.timezone)}
+        initialNoticeHours={availability.noticeHours}
+        horizonDays={availability.horizonDays}
+        status={availability.status}
+        nextSlotLabel={
+          availability.nextSlotAt
+            ? new Date(availability.nextSlotAt).toLocaleString('en-GB', {
+                timeZone: availability.timezone,
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                hour: '2-digit',
+                minute: '2-digit',
+                hourCycle: 'h23',
+              })
+            : null
+        }
       />
     </ConsoleFrame>
   );

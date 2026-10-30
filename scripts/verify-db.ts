@@ -785,6 +785,33 @@ async function main() {
       ok('a date more than a year ahead is refused', await refused([{ date: addDays(today, 400), blocked: true, windows: [] }]));
       ok('a refused save changes nothing', (await getMyAvailability(uid))?.dates.length === 3);
 
+      // Minimum notice: with 30 minutes, hours open today are bookable today.
+      const allDay = [{ startMinute: 0, endMinute: 1440 }];
+      const soonDates = [0, 1].map((n) => ({ date: addDays(today, n), blocked: false, windows: allDay }));
+      await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, dates: soonDates, noticeHours: 0.5 });
+      const soon = await getMyAvailability(uid);
+      const waitMin = soon?.nextSlotAt ? (new Date(soon.nextSlotAt).getTime() - Date.now()) / 60_000 : -1;
+      ok('the notice setting is saved', soon?.noticeHours === 0.5);
+      ok('with 30 minutes notice the next session is within 90 minutes', waitMin >= 30 && waitMin <= 90, `${waitMin} minutes`);
+      ok(
+        'the mentor sees the same first time students do',
+        soon?.nextSlotAt === (await listAvailableSlots(String(datesMentor._id)))[0]?.startsAt,
+      );
+      await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, dates: soonDates, noticeHours: 24 });
+      const later = await getMyAvailability(uid);
+      ok(
+        'with a day of notice nothing in the next 24 hours is offered',
+        !!later?.nextSlotAt && new Date(later.nextSlotAt).getTime() - Date.now() >= 24 * 3_600_000,
+      );
+      let badNotice = false;
+      try {
+        await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, noticeHours: 5 });
+      } catch (err) {
+        badNotice = err instanceof DataError && err.code === 'INVALID_AVAILABILITY';
+      }
+      ok('a notice period outside the list is refused', badNotice);
+      ok('the mentor is shown as approved', later?.status === 'approved');
+
       await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, dates: [] });
       const tuesdayAgain = (await listAvailableSlots(String(datesMentor._id))).filter(
         (sl) => formatZonedDate(new Date(sl.startsAt), tz) === tuesday,

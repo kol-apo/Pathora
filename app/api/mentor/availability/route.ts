@@ -24,6 +24,8 @@ const AvailabilitySchema = z.object({
     )
     .max(120)
     .optional(),
+  // Minimum notice before a session, in hours (checked against the allowed list).
+  noticeHours: z.number().positive().max(168).optional(),
 });
 
 /**
