@@ -11,6 +11,8 @@ import {
   Clock,
   Link2,
   Compass,
+  GraduationCap,
+  MessageSquare,
   LayoutDashboard,
   UserCheck,
   Users,
@@ -47,6 +49,9 @@ const NAV: Record<SidebarVariant, NavItem[]> = {
   admin: [
     { label: 'Overview', href: '/admin', icon: BarChart3, exact: true },
     { label: 'Mentors', href: '/admin/mentors', icon: UserCheck },
+    { label: 'Sessions', href: '/admin/sessions', icon: CalendarDays },
+    { label: 'Feedback', href: '/admin/feedback', icon: MessageSquare },
+    { label: 'Students', href: '/admin/students', icon: GraduationCap },
     { label: 'Opportunities', href: '/admin/opportunities', icon: Briefcase },
   ],
 };

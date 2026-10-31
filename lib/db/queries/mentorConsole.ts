@@ -8,6 +8,7 @@ import { SECTORS, type Sector } from '@/lib/types';
 import { initialsFor } from './accounts';
 import { setBookingStatus } from './bookings';
 import { listAvailableSlots } from './mentors';
+import { refreshMentorRating } from './feedback';
 import { DataError } from './errors';
 import type { MentorLink, MentorSocials } from '@/lib/profileLinks';
 
@@ -366,6 +367,8 @@ export async function respondToBooking(
   if (action === 'complete') {
     await MentorProfile.updateOne({ _id: m!._id }, { $inc: { sessionCount: 1 } });
   }
+  // A rating left before the mentor said it did not happen no longer counts.
+  if (action === 'no_show') await refreshMentorRating(String(m!._id));
   return { studentId: String(booking.student), sector: m!.sector, viaBridge: !!booking.viaBridge };
 }
 

@@ -47,6 +47,8 @@ import {
   updateMyAvailability,
 } from '../lib/db/queries/mentorConsole';
 import { addDays, formatZonedDate } from '../lib/booking/timezone';
+import { rateSession } from '../lib/db/queries/feedback';
+import { feedbackSummary, listParticipants, listSessionsForAdmin } from '../lib/db/queries/adminInsights';
 import { addOpportunity, hideOpportunity, listOpportunities, refreshOpportunities } from '../lib/db/queries/opportunities';
 import { BRIDGE_SIZE, rankCandidates } from '../lib/matching/similarity';
 import { SECTORS } from '../lib/types';
@@ -823,6 +825,78 @@ async function main() {
     } finally {
       await Availability.deleteMany({ mentor: datesMentor._id });
       await MentorProfile.deleteMany({ _id: datesMentor._id });
+    }
+
+    console.log('\n── Student feedback and the admin views ───────────────────');
+    {
+      const rater = await User.create({ name: `Rater Person ${RUN}`, email: `rater.${RUN}@pathora.test`, role: 'student' });
+      const raterCode = `F-${RUN}`;
+      await StudentProfile.create({ user: rater._id, initials: 'RP', participantCode: raterCode, consentVersion: 'test', consentedAt: new Date() });
+      const other = students[4];
+      const at = (hoursFromNow: number) => new Date(Date.now() + hoursFromNow * 3_600_000);
+      const make = (hours: number, status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'no_show') =>
+        Booking.create({ student: rater._id, mentor: mentor._id, topic: `Feedback ${RUN}`, startsAt: at(hours), endsAt: at(hours + 0.75), status });
+      try {
+        const held = await make(-50, 'completed');
+        const ended = await make(-30, 'confirmed');
+        const future = await make(200, 'confirmed');
+        const cancelled = await make(-70, 'cancelled');
+        const refusedWith = async (code: string, fn: () => Promise<unknown>) => {
+          try {
+            await fn();
+            return false;
+          } catch (err) {
+            return err instanceof DataError && err.code === code;
+          }
+        };
+
+        ok('a session that has not ended cannot be rated', await refusedWith('SESSION_NOT_OVER', () => rateSession(String(future._id), String(rater._id), { score: 5 })));
+        ok('a cancelled session cannot be rated', await refusedWith('NOT_RATEABLE', () => rateSession(String(cancelled._id), String(rater._id), { score: 5 })));
+        ok("another student cannot rate someone's session", await refusedWith('BOOKING_NOT_FOUND', () => rateSession(String(held._id), String(other._id), { score: 5 })));
+        ok('stars outside 1 to 5 are refused', await refusedWith('NOT_RATEABLE', () => rateSession(String(held._id), String(rater._id), { score: 6 })));
+
+        await rateSession(String(held._id), String(rater._id), { score: 4, comment: '  Clear advice on my CV.  ' });
+        let m = await MentorProfile.findById(mentor._id).lean();
+        ok('a rating updates the mentor average', m?.ratingAvg === 4 && m?.ratingCount === 1, JSON.stringify({ a: m?.ratingAvg, n: m?.ratingCount }));
+        ok('the comment is kept, trimmed', (await Booking.findById(held._id).lean())?.rating?.comment === 'Clear advice on my CV.');
+        ok('a session can be rated only once', await refusedWith('ALREADY_RATED', () => rateSession(String(held._id), String(rater._id), { score: 1 })));
+
+        await rateSession(String(ended._id), String(rater._id), { score: 3 });
+        m = await MentorProfile.findById(mentor._id).lean();
+        ok('a second rating averages in (4 and 3 make 3.5)', m?.ratingAvg === 3.5 && m?.ratingCount === 2);
+        await respondToBooking(String(mentorUser._id), String(ended._id), 'no_show');
+        m = await MentorProfile.findById(mentor._id).lean();
+        ok('a rating stops counting if the mentor says the session did not happen', m?.ratingAvg === 4 && m?.ratingCount === 1);
+
+        const sessions = await listSessionsForAdmin({ view: 'all', mentorId: String(mentor._id) });
+        const heldRow = sessions.rows.find((r) => r.id === String(held._id));
+        ok('the admin sees each session with its rating and comment', heldRow?.rating?.score === 4 && heldRow.rating.comment === 'Clear advice on my CV.');
+        ok('students appear by participant code', heldRow?.participantCode === raterCode);
+        ok('never by name or email', !JSON.stringify(sessions).includes('Rater Person') && !JSON.stringify(sessions).includes(`rater.${RUN}`));
+        ok('sessions can be filtered by outcome', (await listSessionsForAdmin({ view: 'missed', mentorId: String(mentor._id) })).rows.some((r) => r.id === String(ended._id)));
+        ok('the filter counts add up', sessions.counts.held >= 1 && sessions.counts.missed >= 1 && sessions.counts.cancelled >= 1);
+
+        const feedback = await feedbackSummary();
+        ok('the feedback page lists the comment', feedback.comments.some((c) => c.comment === 'Clear advice on my CV.' && c.participantCode === raterCode));
+        ok('a missed session’s rating is left out of the totals', !feedback.comments.some((c) => c.bookingId === String(ended._id)));
+        const row = feedback.byMentor.find((r) => r.mentorId === String(mentor._id));
+        ok('each mentor has a row of held, missed and cancelled sessions', !!row && row.held >= 1 && row.missed >= 1 && row.cancelled >= 1 && row.averageRating === 4);
+        ok('feedback holds no names or emails', !JSON.stringify(feedback).includes('Rater Person') && !JSON.stringify(feedback).includes(`rater.${RUN}`));
+
+        const people = await listParticipants();
+        const me = people.rows.find((r) => r.participantCode === raterCode);
+        ok('the participant list shows their activity', me?.booked === 4 && me.held === 1 && me.rated === 2, JSON.stringify(me));
+        ok('the participant list holds no names or emails', !JSON.stringify(people).includes('Rater Person'));
+
+        // Deleting the account takes the ratings with it.
+        await User.updateOne({ _id: rater._id }, { $unset: { passwordHash: 1 } });
+        await deleteAccount(String(rater._id), null);
+        m = await MentorProfile.findById(mentor._id).lean();
+        ok("a student's ratings leave with their account", m?.ratingCount === 0 && m?.ratingAvg === 0);
+      } finally {
+        await Booking.deleteMany({ student: rater._id });
+        await StudentProfile.deleteMany({ user: rater._id });
+      }
     }
 
     console.log('\n── Opportunities ──────────────────────────────────────────');

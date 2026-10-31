@@ -38,7 +38,10 @@ export type DataErrorCode =
   | 'TOO_MANY_MESSAGES'
   | 'INVALID_RESET_LINK'
   | 'WRONG_PASSWORD'
-  | 'CANNOT_DELETE_ADMIN';
+  | 'CANNOT_DELETE_ADMIN'
+  | 'SESSION_NOT_OVER'
+  | 'NOT_RATEABLE'
+  | 'ALREADY_RATED';
 
 export class DataError extends Error {
   constructor(
@@ -97,6 +100,9 @@ export const STATUS_FOR_CODE: Record<DataErrorCode, number> = {
   WRONG_PASSWORD: 403,
   // Admin accounts are removed by another admin, not by themselves.
   CANNOT_DELETE_ADMIN: 403,
+  SESSION_NOT_OVER: 409,
+  NOT_RATEABLE: 409,
+  ALREADY_RATED: 409,
 };
 
 export function statusForError(err: unknown): number {

@@ -200,6 +200,8 @@ export type StudyEvent =
   | { type: 'booking_cancelled'; payload: { sector: Sector; viaBridge: boolean; hoursBeforeStart: number } }
   // Recorded under the student's code when their mentor reports how the session went.
   | { type: 'session_outcome'; payload: { sector: Sector; viaBridge: boolean; outcome: 'completed' | 'no_show' } }
+  // The stars only, and whether a comment was left: never the comment itself.
+  | { type: 'session_rated'; payload: { sector: Sector; viaBridge: boolean; score: number; withComment: boolean } }
   // Never the message text: only that a message was sent, and how it was answered.
   | { type: 'pathy_message'; payload: { sector: Sector; promptVersion: string; model: string; usedFallback: boolean } };
 

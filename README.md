@@ -28,12 +28,12 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Discovery and the bridge | Built. A consented student's result is saved with its interest vector, and its three mentors are surfaced and recorded. Opening one of their profiles records the view; booking from it records a bridge booking. Saved results have their own roadmap page (`/discover/results/:id`). Only mentors taking bookings are matched. |
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
-| Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. |
-| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (297 checks) and `npm run verify:db` (99 checks) pass. |
+| Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. After a session, students rate it from 1 to 5 stars with an optional comment; the stars count towards the mentor's rating, the comment is read only by the Pathora team. |
+| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (297 checks) and `npm run verify:db` (120 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. "Forgot your password?" emails a link that works once, for an hour; resetting signs the account out everywhere. The Account page lets students withdraw from the study, which deletes the account and everything recorded about them, research events included. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
-| Admin console (`/admin`) | Built: platform counts and the research reports, and mentor review (approve with an interest profile, reject, suspend, reinstate). |
+| Admin console (`/admin`) | Built: platform counts and the research reports; mentor review (approve with an interest profile, reject, suspend, reinstate); every session with its outcome, video join and rating; student feedback with ratings, comments and a per-mentor table; and each participant's activity. Students appear by participant code only. |
 | `prompts/discovery.json` | Specified, and validated offline by `prompts/validate_prompt.py`. **No live generation yet:** no code calls the Claude API with this specification. |
 | Research events | Recorded on the server under the student's participant code: discovery completed, bridge surfaced, bridge profile viewed, booking requested, booking cancelled, session outcome (held or not, as the mentor reports it), Pathy message sent (never its text). Payloads carry no ids. Students who have not consented are not recorded. |
 | Live AI | Gemini, on Google's free tier for now, through its OpenAI-compatible endpoint (set the `AI_*` variables; see `.env.example`). With no key, Career Discovery runs on the offline matcher, which is also the fallback if Gemini fails. It uses the app's own prompt (`lib/ai/prompt.ts`), not `prompts/discovery.json`, which was written for Claude. On the free tier Google may use prompts and responses to improve its products, and human reviewers may read them, so it is for testing until the consent form covers it or a paid tier is used. |
@@ -128,7 +128,7 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 
 ```bash
 npm run verify      # 297 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
-npm run verify:db   # 99 live checks: double booking, date-specific hours, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
+npm run verify:db   # 120 live checks: double booking, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
@@ -301,7 +301,7 @@ app/                        Pages and API routes (Next.js App Router)
   welcome/                  Research consent, shown once after sign-up
   become-a-mentor/          Mentor application
   mentor/                   Mentor console: sessions, weekly hours and specific dates
-  admin/                    Admin console: overview, research reports, mentor review
+  admin/                    Admin console: overview, research reports, mentor review, sessions, feedback, students
   api/
     discovery/              POST   run the discovery agent on a set of answers
     mentors/                GET    list consultants (sector, sort, search)

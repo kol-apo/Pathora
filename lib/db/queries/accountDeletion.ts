@@ -12,6 +12,7 @@ import {
   User,
   VideoSession,
 } from '../models';
+import { refreshMentorRating } from './feedback';
 import { DataError } from './errors';
 
 /**
@@ -49,9 +50,12 @@ export async function deleteAccount(userId: string, password: string | null): Pr
   await BridgeRecommendation.deleteMany({ discoveryResult: { $in: resultIds } });
   report.discoveryResults = (await DiscoveryResult.deleteMany({ _id: { $in: resultIds } })).deletedCount;
 
-  const studentBookings = await Booking.find({ student: userId }).select('_id').lean();
+  const studentBookings = await Booking.find({ student: userId }).select('_id mentor rating').lean();
   await VideoSession.deleteMany({ booking: { $in: studentBookings.map((b) => b._id) } });
   report.bookings += (await Booking.deleteMany({ student: userId })).deletedCount;
+  // Their ratings go with them, so the mentors they rated get a fresh average.
+  const rated = [...new Set(studentBookings.filter((b) => b.rating).map((b) => String(b.mentor)))];
+  for (const mentorId of rated) await refreshMentorRating(mentorId);
 
   const profile = await StudentProfile.findOne({ user: userId }).select('participantCode').lean();
   if (profile?.participantCode) {

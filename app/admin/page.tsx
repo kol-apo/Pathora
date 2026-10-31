@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import ConsoleFrame from '@/components/console/ConsoleFrame';
 import { platformCounts } from '@/lib/db/queries/admin';
+import { sessionHeadline } from '@/lib/db/queries/adminInsights';
 import { bridgeFunnel, schemaValidation, sessionCompletion } from '@/lib/db/queries/research';
 
 export const metadata = { title: 'Admin · Pathora' };
@@ -41,11 +42,12 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
 
 /** Admin overview: who is on the platform, what needs attention, and the study's measures. */
 export default async function AdminOverviewPage() {
-  const [counts, funnel, validity, sessions] = await Promise.all([
+  const [counts, funnel, validity, sessions, headline] = await Promise.all([
     platformCounts(),
     bridgeFunnel(),
     schemaValidation(),
     sessionCompletion(),
+    sessionHeadline(),
   ]);
   const pending = counts.mentors.pending_review;
 
@@ -68,12 +70,23 @@ export default async function AdminOverviewPage() {
         </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Stat value={counts.students} label="Students" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat value={counts.students} label="Students" href="/admin/students" />
         <Stat value={counts.mentors.approved} label="Approved mentors" href="/admin/mentors?status=approved" />
         <Stat value={pending} label="Applications" href="/admin/mentors" />
-        <Stat value={counts.upcomingBookings} label="Upcoming sessions" />
         <Stat value={counts.discoveryResults} label="Discovery results" />
+        <Stat value={counts.upcomingBookings} label="Upcoming sessions" href="/admin/sessions?view=upcoming" />
+        <Stat value={headline.held} label="Sessions held" href="/admin/sessions?view=held" />
+        <Stat
+          value={headline.awaitingOutcome}
+          label="Waiting for the mentor's outcome"
+          href="/admin/sessions?view=awaiting"
+        />
+        <Stat
+          value={headline.averageRating !== null ? `${headline.averageRating.toFixed(1)} / 5` : '–'}
+          label={headline.ratings ? `Average of ${headline.ratings} student rating${headline.ratings === 1 ? '' : 's'}` : 'No student ratings yet'}
+          href="/admin/feedback"
+        />
       </div>
 
       <Panel
