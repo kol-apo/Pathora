@@ -146,6 +146,7 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 ### Checking that it works
 
 ```bash
+npm run lint        # ESLint (Next.js and TypeScript rules) over app, components, lib, scripts and tests
 npm run verify      # 300 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
 npm run verify:db:local   # the same live checks against a throwaway database; never touches the real one
 npm run verify:db   # 127 live checks (uses MONGODB_URI; creates its own records and removes them): double booking, overlapping starts, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
@@ -162,6 +163,7 @@ The browser tests start their own throwaway database and a production build of t
 
 | Strategy | Where | What it covers |
 | --- | --- | --- |
+| Static analysis | `npm run lint`, `npx tsc --noEmit` | ESLint with the Next.js and TypeScript rules (`.eslintrc.json`), and strict TypeScript |
 | Unit | `scripts/verify.ts` (`npm run verify`) | Pure logic with fixed inputs and edge cases: slots across timezones and daylight saving, cosine ranking, interest vectors, the availability grid, AI output parsing and fallback, feed parsing, prompt rules, video room rules |
 | Integration | `scripts/verify-db.ts` (`npm run verify:db`) | The data layer against a real MongoDB: indexes, access rules, the bridge, bookings, feedback, admin views, password resets, account deletion |
 | Concurrency | within `verify:db` | Five students book the same slot at the same instant; exactly one succeeds |
@@ -366,7 +368,7 @@ app/                        Pages and API routes (Next.js App Router)
     account/delete/         POST   withdraw and delete an account
 components/                 Interface components
   auth/                     Sign-in, sign-up and consent forms
-  console/                  Mentor and admin console pieces
+  console/                  Mentor and admin console pieces; availability/ holds the parts of the availability editor
   brand/                    Pathy, the guide character
   landing/                  Landing page hero and sections
   consultant/               Consultant cards, sector filter, booking panel

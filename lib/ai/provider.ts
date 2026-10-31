@@ -1,5 +1,8 @@
 import type { DiscoveryAnswers } from '@/lib/discovery/questions';
 import type { CareerMatch } from './schema';
+import { createMockProvider } from './providers/mock';
+import { createOpenAICompatibleComplete, createOpenAICompatibleProvider } from './providers/openaiCompatible';
+import type { CompleteFn } from './providers/llm';
 
 /**
  * The seam between Pathora and whichever model produces career matches.
@@ -47,11 +50,7 @@ export class ProviderConfigError extends Error {
 export function resolveProvider(env: ProviderEnv = process.env): DiscoveryProvider {
   const kind = (env.AI_PROVIDER ?? 'mock').trim().toLowerCase();
 
-  // Imported lazily so the mock path never pulls in the HTTP adapter, and vice
-  // versa — keeps this resolvable in environments without fetch configured.
   if (kind === 'mock' || kind === '') {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { createMockProvider } = require('./providers/mock') as typeof import('./providers/mock');
     return createMockProvider();
   }
 
@@ -67,9 +66,6 @@ export function resolveProvider(env: ProviderEnv = process.env): DiscoveryProvid
     }
 
     const timeout = Number(env.AI_TIMEOUT_MS);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { createOpenAICompatibleProvider } =
-      require('./providers/openaiCompatible') as typeof import('./providers/openaiCompatible');
 
     return createOpenAICompatibleProvider({
       baseUrl: env.AI_BASE_URL!.trim(),
@@ -99,7 +95,7 @@ function hostLabel(baseUrl: string): string {
 export interface ChatModel {
   name: string;
   model: string;
-  complete: import('./providers/llm').CompleteFn;
+  complete: CompleteFn;
 }
 
 /**
@@ -111,9 +107,6 @@ export function resolveChatModel(env: ProviderEnv = process.env): ChatModel | nu
   if (!env.AI_BASE_URL?.trim() || !env.AI_MODEL?.trim() || !env.AI_API_KEY?.trim()) return null;
 
   const timeout = Number(env.AI_TIMEOUT_MS);
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { createOpenAICompatibleComplete } =
-    require('./providers/openaiCompatible') as typeof import('./providers/openaiCompatible');
   return {
     name: hostLabel(env.AI_BASE_URL),
     model: env.AI_MODEL.trim(),

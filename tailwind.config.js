@@ -33,7 +33,7 @@ module.exports = {
         available: '#16A34A',
       },
       fontFamily: {
-        sans: ['var(--font-geist)', 'Geist', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['var(--font-geist-sans)', 'system-ui', '-apple-system', 'sans-serif'],
       },
       fontSize: {
         micro: ['11px', { lineHeight: '1.2', letterSpacing: '0.07em' }],

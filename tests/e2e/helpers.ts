@@ -1,5 +1,5 @@
 import { test as base, expect, type Page } from '@playwright/test';
-import { MongoClient, ObjectId, type Db } from 'mongodb';
+import { MongoClient, type Db, type ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 
 /**

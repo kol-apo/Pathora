@@ -1,6 +1,6 @@
 import type { DiscoveryAnswers } from '@/lib/discovery/questions';
 import { buildRepairPrompt, buildUserPrompt, SYSTEM_PROMPT } from '../prompt';
-import { parseCareerMatch, type CareerMatch } from '../schema';
+import { parseCareerMatch } from '../schema';
 import type { DiscoveryProvider, Generated } from '../provider';
 
 export interface ChatMessage {

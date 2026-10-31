@@ -17,6 +17,7 @@ Results measured on 31 October 2026. How to rerun each one is in the main [READM
 
 | Strategy | Tool | Result |
 | --- | --- | --- |
+| Static checks | `npx tsc --noEmit`, `npm run lint` (ESLint with the Next.js and TypeScript rules) | No type errors; no lint warnings or errors across app, components, lib, scripts and tests |
 | Unit | `npm run verify` | 300 of 300 checks pass |
 | Integration (real database) | `npm run verify:db` / `npm run verify:db:local` | 127 of 127 checks pass |
 | Concurrency | within `verify:db` | 5 simultaneous bookings of one slot: exactly 1 succeeds. 4 simultaneous bookings at overlapping times 15 minutes apart: exactly 1 succeeds; the database refuses an overlap even when the app's own check is skipped |
@@ -63,10 +64,12 @@ Playwright's WebKit build for Windows (the engine behind Safari, but not Safari 
 | The browser test runner froze before the first test | Waiting synchronously for the seeding step blocked the runner, so the in-memory database could not write its logs and stopped answering | The runner waits asynchronously |
 | Sign-in failed in the production test build | Auth.js only trusts its own address automatically on Vercel | The test runner sets `AUTH_TRUST_HOST` |
 | Two checks matched Next.js's hidden route announcer as an "alert" | The page has two alert regions | The checks look for the alert with the expected text |
+| The landing page shifted on phones (layout shift 0.17, above Google's 0.1 limit), found by Lighthouse | The web font arrived from Google Fonts after the page was drawn, and the redrawn headline pushed the page down (confirmed: 0 with the font blocked) | Geist served by the app through `next/font`, with a size-matched fallback: 0.17 → 0.035 |
+| Local production pages sometimes never finished loading | Next.js's image resizer stalls on Windows without the `sharp` library (Next.js warns about it); Vercel provides its own | `sharp` added as a dependency |
 
 ## Performance
 
-Measured with Google Lighthouse 12.6 against a production build on the test machine (`node tests/performance/lighthouse.mjs http://localhost:3077 --email … --password …`). Full table: [tests/performance/results/](../../tests/performance/results/2026-10-31-15-17-localhost_3077.md).
+Measured with Google Lighthouse 12.6 against a production build on the test machine (`node tests/performance/lighthouse.mjs http://localhost:3077 --email … --password …`).
 
 The three device profiles:
 
@@ -76,23 +79,47 @@ The three device profiles:
 
 Network delay is simulated, so these show how the pages themselves behave; the live site adds Vercel's real network on top.
 
-| Page | Performance (desktop / mid-range / low-end) | Largest content visible (desktop / mid-range / low-end) | Accessibility | Best practices | SEO | Page weight |
-| --- | --- | --- | --- | --- | --- | --- |
-| Landing `/` | 87 / 77 / 73 | 1.5 s / 3.2 s / 3.3 s | 96 | 100 | 100 | 193–210 KB |
-| Sign in | 92 / 86 / 84 | 1.3 s / 3.2 s / 2.7 s | 96 | 100 | 100 | 187 KB |
-| Dashboard | 88 / 84 / 73 | 1.4 s / 3.3 s / 3.0 s | 96 | 100 | 100 | 190 KB |
-| Mentors `/explore` | 91 / 92 / 84 | 1.3 s / 2.4 s / 3.3 s | 94 | 100 | 100 | 209–213 KB |
-| Opportunities | 95 / 83 / 66 | 1.1 s / 3.2 s / 3.0 s | 96 | 100 | 100 | 191 KB |
-| Sessions | 73 / 95 / 54 | 2.4 s / 2.4 s / 3.9 s | 96 | 100 | 100 | 194 KB |
+The pages were measured twice: before and after serving the web font from the app itself (see [the layout shift](#the-layout-shift-on-phones-found-and-fixed) below). Full tables: [before](../../tests/performance/results/2026-10-31-15-17-localhost_3077.md), [after](../../tests/performance/results/2026-10-31-16-43-localhost_3077.md).
+
+**After the fix:**
+
+| Page | Performance (desktop / mid-range / low-end) | Largest content visible (desktop / mid-range / low-end) | Layout shift (phone) | Accessibility | Best practices | SEO | Page weight |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Landing `/` | 99 / 91 / 72 | 0.7 s / 2.6 s / 2.9 s | 0.035 | 96 | 100 | 100 | 219–236 KB |
+| Sign in | 99 / 82 / 74 | 0.7 s / 2.6 s / 2.8 s | 0 | 96 | 100 | 100 | 212 KB |
+| Dashboard | 100 / 90 / 74 | 0.7 s / 2.6 s / 3.2 s | 0.019 | 96 | 100 | 100 | 216 KB |
+| Mentors `/explore` | 100 / 94* / 66 | 0.7 s / 2.5 s* / 2.9 s | 0 | 94 | 100 | 100 | 235–239 KB |
+| Opportunities | 100 / 92 / 72 | 0.6 s / 2.7 s / 3.3 s | 0 | 96 | 100 | 100 | 217 KB |
+| Sessions | 100 / 94 / 77 | 0.7 s / 2.6 s / 3.0 s | 0.001 | 96 | 100 | 100 | 220 KB |
+
+\* One run of this cell scored 36 (6.1 s); three re-runs gave 95, 94 and 88 (2.5–2.7 s), so the median of the re-runs is shown.
+
+**Before the fix** (Geist loaded from Google Fonts):
+
+| Page | Performance (desktop / mid-range / low-end) | Largest content visible (desktop / mid-range / low-end) | Layout shift (phone) |
+| --- | --- | --- | --- |
+| Landing `/` | 87 / 77 / 73 | 1.5 s / 3.2 s / 3.3 s | **0.17** |
+| Sign in | 92 / 86 / 84 | 1.3 s / 3.2 s / 2.7 s | 0 |
+| Dashboard | 88 / 84 / 73 | 1.4 s / 3.3 s / 3.0 s | 0.019 |
+| Mentors `/explore` | 91 / 92 / 84 | 1.3 s / 2.4 s / 3.3 s | 0.013 |
+| Opportunities | 95 / 83 / 66 | 1.1 s / 3.2 s / 3.0 s | 0 |
+| Sessions | 73 / 95 / 54 | 2.4 s / 2.4 s / 3.9 s | 0 |
 
 What this shows:
 
-- **Every page is light**: under 215 KB including scripts, styles and images, which matters on mobile data. Mentor photos were pre-shrunk to 3–13 KB each.
-- **Desktop scores are 87–95 on five of six pages**, with the main content visible in about 1.1–1.5 seconds. The Sessions page is lower (73) because its list is grouped into Today, Coming up and Past in the browser, after the page loads; the server cannot know the viewer's timezone.
-- **On phones, content appears in 2.4–3.3 seconds** on the mid-range profile, within Google's 4-second "needs improvement" band and close to its 2.5-second "good" mark.
-- **The low-end phone is the weak spot.** "Blocking time", when a slow processor is busy running the page's JavaScript and cannot respond to taps, rises to 0.8 s on the dashboard, 1.4 s on Opportunities and 2.9 s on Sessions. These pages do work in the browser after loading (grouping sessions, filtering opportunities). Moving that work to the server, or splitting the scripts, would be the next improvement.
+- **Desktop: 99–100 on every page, with the main content visible in 0.6–0.7 seconds** (1.1–2.4 s before). Text no longer waits for a font from another server.
+- **Mid-range phone: content visible in 2.5–2.7 seconds**, around Google's 2.5-second "good" mark (2.4–3.3 s before).
+- **Every page is light**: 212–239 KB including scripts, styles, images and the font, which matters on mobile data. The font files now count towards each page (about 25 KB), but save a connection to another server. Mentor photos were pre-shrunk to 3–13 KB each.
+- **The low-end phone is still the weak spot.** "Blocking time", when a slow processor is busy running the page's JavaScript and cannot respond to taps, is 0.7–1.0 s on most pages and up to 2.9 s on Mentors. These pages do work in the browser after loading (filtering mentors, grouping sessions). Moving that work to the server, or splitting the scripts, would be the next improvement.
 - **Accessibility 94–96, best practices 100, SEO 100** on every page and device.
-- Lighthouse scores vary by a few points between runs on the same machine; each row is one run.
+- Scores vary by a few points between runs on the same machine; each row is one run unless marked.
+
+### The layout shift on phones: found and fixed
+
+- **Found:** Lighthouse measured a layout shift of 0.17 on the landing page on phones, above Google's 0.1 "good" limit, both on the test build and on the live site. It named the moving element: the "How Pathora works" illustration below the headline.
+- **Cause, confirmed:** run again with the web font blocked, the shift was 0. The Geist font came from Google Fonts with `display=swap`: the page first drew the headline in a fallback font, then redrew it in Geist at a slightly different size, pushing everything below it down.
+- **Fix:** Geist is now served by the app itself through Next.js's font system (the `geist` package with `next/font`), which sizes the fallback font to match Geist's measurements, so nothing moves when it arrives (`app/layout.tsx`).
+- **Result:** layout shift 0.17 → 0.035 on the phone profiles, and the main content appears sooner on every page (above).
 
 ### The live site (Vercel)
 
@@ -105,7 +132,7 @@ Measured on https://usepathora.vercel.app with the same script (`node tests/perf
 
 - **The landing page is slower live than on the test machine** (2.3 s against 1.5 s on desktop), because real requests travel to Vercel's servers and the page loads live data from MongoDB Atlas (mentor counts and the real mentor photos, which also make it about 50 KB heavier).
 - **The sign-in page stays quick** on every profile (1.8–3.0 s), since it needs no database data.
-- **Finding to fix:** on phones the landing page shifts as it loads (layout shift 0.17, above Google's 0.1 "good" limit, both locally and live). Something near the top is drawn without its final size reserved. Giving that element a fixed height would fix it.
+- **Layout shift:** on phones the live landing page shifted by 0.17 as it loaded, the same as the test build. This was fixed (see [above](#the-layout-shift-on-phones-found-and-fixed)); the live numbers above were measured before the fix was deployed.
 
 ### AI and video
 

@@ -1,0 +1,25 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals", "plugin:@typescript-eslint/recommended"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "@typescript-eslint/consistent-type-imports": ["error", { "fixStyle": "inline-type-imports" }],
+    "eqeqeq": ["error", "smart"],
+    "no-console": ["warn", { "allow": ["info", "warn", "error"] }]
+  },
+  "overrides": [
+    {
+      "files": ["scripts/**", "tests/**", "*.config.*"],
+      "rules": { "no-console": "off" }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    ".next-e2e/",
+    "tests/e2e/report/",
+    "test-results/",
+    "prompts/",
+    "next-env.d.ts"
+  ]
+}
