@@ -7,8 +7,8 @@ Pathora is a Next.js application on **MongoDB**. The same database holds the app
 | | |
 | --- | --- |
 | Live site | https://usepathora.vercel.app |
-| Walkthrough video | _add the link_ |
-| Technical report (PDF) | _add the link_ |
+| Walkthrough video | [Google Drive](https://drive.google.com/drive/folders/1RxAJ9gbegF_EfV8NSAhBJCtTp9mqG0jE?usp=sharing) |
+| Technical report | [Google Docs](https://docs.google.com/document/d/1G2iUN75wDklCgr0b6aTgqC6hUNHOCKNgLgTlknWemDQ/edit?usp=sharing); the PDF is in the [same Google Drive folder](https://drive.google.com/drive/folders/1RxAJ9gbegF_EfV8NSAhBJCtTp9mqG0jE?usp=sharing) as the video |
 | Testing, performance and compatibility results | [docs/testing/](docs/testing/README.md) |
 
 ## Three architectural questions
@@ -325,7 +325,11 @@ Also add `AUTH_SECRET` (and the Google keys, if used) in Vercel. For Google sign
 
 ## Video demo
 
-https://youtu.be/562JOBwNsII
+The technical walkthrough (features, how they work, error handling, testing, and performance and compatibility): [Google Drive](https://drive.google.com/drive/folders/1RxAJ9gbegF_EfV8NSAhBJCtTp9mqG0jE?usp=sharing)
+
+The technical report: [Google Docs](https://docs.google.com/document/d/1G2iUN75wDklCgr0b6aTgqC6hUNHOCKNgLgTlknWemDQ/edit?usp=sharing). A PDF copy is in the [same Google Drive folder](https://drive.google.com/drive/folders/1RxAJ9gbegF_EfV8NSAhBJCtTp9mqG0jE?usp=sharing), beside the video.
+
+Both links are shared with ALU accounts.
 
 ## Code files
 
