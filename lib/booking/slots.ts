@@ -32,7 +32,16 @@ export interface AvailabilityRules {
   bufferMinutes: number;
   leadTimeHours: number;
   horizonDays: number;
+  /** How often a session may start inside a window. Defaults to SLOT_INTERVAL_MINUTES. */
+  slotIntervalMinutes?: number;
 }
+
+/**
+ * Students can start a session at any quarter hour (13:00, 13:15, 13:30, 13:45)
+ * inside a mentor's free time. Once one is booked, every start that would
+ * overlap it, or fall inside the break after it, disappears.
+ */
+export const SLOT_INTERVAL_MINUTES = 15;
 
 export interface Slot {
   startsAt: Date;
@@ -103,7 +112,7 @@ export function generateSlots(input: GenerateSlotsInput): Slot[] {
   const { rules, timeZone, busy = [] } = input;
   const now = input.now ?? new Date();
 
-  const step = rules.sessionMinutes + rules.bufferMinutes;
+  const step = rules.slotIntervalMinutes ?? SLOT_INTERVAL_MINUTES;
   if (step <= 0 || rules.sessionMinutes <= 0) return [];
 
   const earliest = new Date(now.getTime() + rules.leadTimeHours * 3_600_000);

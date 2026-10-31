@@ -45,11 +45,13 @@ import {
   zonedWallTimeToUtc,
 } from '../lib/booking/timezone';
 import {
+  conflictsWithBusy,
   findSlot,
   generateSlots,
   groupSlotsByDay,
   type AvailabilityRules,
 } from '../lib/booking/slots';
+import { blocksFor } from '../lib/db/models/Booking';
 import {
   ENVIRONMENT_OPTIONS,
   INTEREST_OPTIONS,
@@ -194,13 +196,16 @@ async function slotTests() {
   const monday = nextDayOfWeek('2026-09-07', 1);
   const now = new Date('2026-09-01T00:00:00Z');
 
-  // 09:00–12:00 with 45m sessions + 15m buffer = starts at 09:00, 10:00, 11:00.
+  // 09:00–12:00 Lagos: a 45-minute session can start every 15 minutes, from
+  // 09:00 to 11:15 (which ends exactly at 12:00). Lagos is UTC+1.
   const slots = generateSlots({ rules: baseRules(), timeZone: tz, now });
   const mondaySlots = slots.filter((s) => formatZonedDate(s.startsAt, tz) === monday);
   eq(
-    'three slots on the Monday, correct UTC instants',
+    'quarter-hour starts on the Monday, correct UTC instants',
     mondaySlots.map((s) => iso(s.startsAt)),
-    [`${monday}T08:00:00.000Z`, `${monday}T09:00:00.000Z`, `${monday}T10:00:00.000Z`],
+    ['08:00', '08:15', '08:30', '08:45', '09:00', '09:15', '09:30', '09:45', '10:00', '10:15'].map(
+      (t) => `${monday}T${t}:00.000Z`,
+    ),
   );
   eq('slot length is 45 minutes', mondaySlots[0].endsAt.getTime() - mondaySlots[0].startsAt.getTime(), 45 * 60_000);
   ok('only Mondays are generated', slots.every((s) => isoDateDayOfWeek(formatZonedDate(s.startsAt, tz)) === 1));
@@ -250,7 +255,8 @@ async function slotTests() {
     overridden
       .filter((s) => formatZonedDate(s.startsAt, tz) === monday)
       .map((s) => iso(s.startsAt)),
-    [`${monday}T13:00:00.000Z`], // 14:00 Lagos; 15:00 would end 15:45 > 15:30
+    // 14:00–14:45 Lagos; 15:00 would end 15:45, after 15:30
+    [`${monday}T13:00:00.000Z`, `${monday}T13:15:00.000Z`, `${monday}T13:30:00.000Z`, `${monday}T13:45:00.000Z`],
   );
 
   // Busy intervals.
@@ -263,9 +269,11 @@ async function slotTests() {
     ],
   }).filter((s) => formatZonedDate(s.startsAt, tz) === monday);
   eq(
-    'an existing booking removes exactly its own slot',
+    'a booking removes every start that overlaps it or its break',
     exactClash.map((s) => iso(s.startsAt)),
-    [`${monday}T08:00:00.000Z`, `${monday}T10:00:00.000Z`],
+    // Booked 09:00–09:45 UTC: 08:00 still ends with a full break before it;
+    // the next free start is 10:00, after the 15-minute break.
+    [`${monday}T08:00:00.000Z`, `${monday}T10:00:00.000Z`, `${monday}T10:15:00.000Z`],
   );
 
   // Buffer: this booking does not overlap the 08:00 slot, but leaves < 15m gap.
@@ -278,9 +286,9 @@ async function slotTests() {
     ],
   }).filter((s) => formatZonedDate(s.startsAt, tz) === monday);
   eq(
-    'buffer removes a non-overlapping but too-close slot',
+    'buffer removes non-overlapping but too-close starts',
     bufferClash.map((s) => iso(s.startsAt)),
-    [`${monday}T10:00:00.000Z`],
+    [`${monday}T10:00:00.000Z`, `${monday}T10:15:00.000Z`],
   );
 
   // findSlot — the server-side guard.
@@ -1382,7 +1390,38 @@ async function hourGridTests() {
   const now = new Date('2026-11-01T00:00:00Z');
   const offered = generateSlots({ rules, timeZone: 'UTC', now, from: now, to: new Date('2026-11-05T00:00:00Z') })
     .map((s) => s.startsAt.toISOString().slice(11, 16));
-  ok('students are offered exactly the tapped hours', offered.join(',') === '10:00,11:00,15:00', offered.join(','));
+  ok(
+    'students are offered every quarter hour inside the tapped hours',
+    offered.join(',') === '10:00,10:15,10:30,10:45,11:00,11:15,15:00,15:15',
+    offered.join(','),
+  );
+
+  section('Overlap blocks: the database guard matches the booking rule');
+  // For every pair of starts across three hours, two bookings must share a
+  // 15-minute block exactly when the slot rules would call them a clash.
+  const base = Date.parse('2026-11-04T08:00:00Z');
+  let agree = true;
+  let disagreement = '';
+  for (let a = 0; a < 12 && agree; a++) {
+    for (let b = 0; b < 12; b++) {
+      const as = new Date(base + a * 15 * 60_000);
+      const bs = new Date(base + b * 15 * 60_000);
+      const ae = new Date(as.getTime() + 45 * 60_000);
+      const be = new Date(bs.getTime() + 45 * 60_000);
+      const aBlocks = new Set(blocksFor(as, ae).map((d) => d.getTime()));
+      const share = blocksFor(bs, be).some((d) => aBlocks.has(d.getTime()));
+      const clash = conflictsWithBusy(as, ae, [{ startsAt: bs, endsAt: be }], 15 * 60_000);
+      if (share !== clash) {
+        agree = false;
+        disagreement = `${as.toISOString()} vs ${bs.toISOString()}: blocks ${share}, rule ${clash}`;
+        break;
+      }
+    }
+  }
+  ok('shared blocks ⇔ a clash, for every pair of quarter-hour starts', agree, disagreement);
+  eq('a booking claims its 45 minutes plus the break: 4 blocks', blocksFor(new Date(base), new Date(base + 45 * 60_000)).length, 4);
+  const odd = blocksFor(new Date(base + 10 * 60_000), new Date(base + 55 * 60_000)).map((d) => d.toISOString().slice(11, 16));
+  ok('an odd start rounds outward, so the check only gets stricter', odd.join(',') === '08:00,08:15,08:30,08:45,09:00', odd.join(','));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

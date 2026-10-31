@@ -15,6 +15,26 @@ export const ACTIVE_BOOKING_STATUSES: BookingStatus[] = [
   'no_show',
 ];
 
+/** Booked time is claimed in blocks of this many minutes (see `blocksFor`). */
+export const BLOCK_MINUTES = 15;
+/** The break kept free after every session. Matches Availability.bufferMinutes. */
+export const BOOKING_BUFFER_MINUTES = 15;
+
+/**
+ * The 15-minute blocks a booking occupies: from its start to the end of the
+ * break after it. Two bookings with the same mentor that overlap, or that
+ * leave less than the break between them, always share at least one block.
+ * The start is rounded down and the end up, so an odd time can only make the
+ * check stricter, never looser.
+ */
+export function blocksFor(startsAt: Date, endsAt: Date, bufferMinutes = BOOKING_BUFFER_MINUTES): Date[] {
+  const step = BLOCK_MINUTES * 60_000;
+  const end = endsAt.getTime() + bufferMinutes * 60_000;
+  const blocks: Date[] = [];
+  for (let t = Math.floor(startsAt.getTime() / step) * step; t < end; t += step) blocks.push(new Date(t));
+  return blocks;
+}
+
 export interface IBookingNote {
   body: string;
   author: Types.ObjectId;
@@ -58,6 +78,9 @@ export interface IBooking {
 
   notes: IBookingNote[];
   rating?: IBookingRating;
+
+  /** Derived from startsAt and endsAt by a pre-validate hook. Never set it by hand. */
+  blocks: Date[];
 
   cancelledBy?: Types.ObjectId;
   cancelledAt?: Date;
@@ -109,6 +132,7 @@ const BookingSchema = new Schema<IBooking>(
     // Bounded and always read alongside the booking, so embedded rather than
     // split into their own collection.
     notes: { type: [BookingNoteSchema], default: [] },
+    blocks: { type: [Date], default: undefined },
     rating: { type: BookingRatingSchema },
 
     cancelledBy: { type: Schema.Types.ObjectId, ref: 'User' },
@@ -131,6 +155,8 @@ BookingSchema.pre('validate', function () {
   }
   // Keep the index discriminator in step with status on every write.
   this.active = ACTIVE_BOOKING_STATUSES.includes(this.status);
+  // And the claimed blocks in step with the time.
+  this.blocks = blocksFor(this.startsAt, this.endsAt);
 });
 
 /**
@@ -146,6 +172,23 @@ BookingSchema.index(
     unique: true,
     partialFilterExpression: { active: true },
     name: 'one_active_booking_per_slot',
+  },
+);
+
+/**
+ * The overlap guarantee. Sessions can start every 15 minutes, so two clashing
+ * bookings may have different start times; the index above would not see
+ * them. Here every active booking claims its blocks, and MongoDB refuses a
+ * second active booking that claims any of the same blocks for the same
+ * mentor, however two requests are timed. (`blocks` must exist: bookings
+ * saved before this change gain it on their next save.)
+ */
+BookingSchema.index(
+  { mentor: 1, blocks: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { active: true, blocks: { $exists: true } },
+    name: 'no_overlapping_active_bookings',
   },
 );
 

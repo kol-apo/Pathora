@@ -7,6 +7,7 @@ import type { OpportunityDTO } from '@/lib/db/queries/dto';
 import { MANUAL_SOURCES, OPPORTUNITY_TYPES, SOURCES } from '@/lib/opportunities/sources';
 import { deadlineLabel } from '@/lib/opportunities/format';
 import { SECTORS } from '@/lib/types';
+import { useHydrated } from '@/components/ui/useHydrated';
 
 const field =
   'h-11 w-full rounded border border-line bg-white px-3 text-[14px] text-ink outline-none focus:border-navy';
@@ -31,6 +32,7 @@ export default function OpportunityAdmin({
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<Report[] | null>(null);
   const [saving, setSaving] = useState(false);
+  const hydrated = useHydrated();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [hiding, setHiding] = useState<string | null>(null);
 
@@ -170,7 +172,7 @@ export default function OpportunityAdmin({
           <div className="flex flex-wrap items-center gap-3 md:col-span-2">
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !hydrated}
               className="inline-flex items-center gap-2 rounded bg-navy px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-deep disabled:opacity-60"
             >
               {saving && <Loader2 size={15} className="animate-spin" />}

@@ -4,11 +4,18 @@ Most AI career tools for students stop at advice. Pathora treats advice as incom
 
 Pathora is a Next.js application on **MongoDB**. The same database holds the application's data and the research data the study collects. The schema is documented in [docs/data-model.md](docs/data-model.md), and the AI prompt is specified and validated in [prompts/](prompts/).
 
+| | |
+| --- | --- |
+| Live site | _add the Vercel link_ |
+| Walkthrough video | _add the link_ |
+| Technical report (PDF) | _add the link_ |
+| Testing, performance and compatibility results | [docs/testing/](docs/testing/README.md) |
+
 ## Three architectural questions
 
 | Question | Mechanism | Verified by |
 | --- | --- | --- |
-| What stops two students booking one slot? | Two layers. `createBooking()` regenerates the mentor's open slots and accepts only a real, free one. The unique index `one_active_booking_per_slot` then lets MongoDB accept only one active booking per mentor and start time, even if two requests pass the first check at the same instant. | `npm run verify:db`: five students book the same slot at once; exactly one succeeds and the rest get a clean "slot taken". |
+| What stops two students booking one slot? | Two layers. `createBooking()` regenerates the mentor's open slots and accepts only a real, free one. Sessions can start every 15 minutes, so two clashing bookings may have different start times. Each booking therefore claims the 15-minute blocks it covers, including the 15-minute break after it, and the unique index `no_overlapping_active_bookings` lets MongoDB accept only one active booking per mentor and block, even if two requests pass the first check at the same instant. | `npm run verify:db`: five students book the same slot at once, and four book overlapping times 15 minutes apart at once; each time exactly one succeeds and the rest get a clean "slot taken". |
 | How are consultants matched, and why that metric? | `surfaceBridgeConsultants()` ranks approved consultants in the result's sector only, by cosine similarity between the student's interest vector and each consultant's, and records the top three. Cosine compares only the direction of interests, so a student who writes long answers is not scored as closer to everyone than one who writes short answers. | `npm run verify` (the ranking maths) and `npm run verify:db` (ranking against the live database matches an independent recalculation, the sector guard, the conversion funnel). |
 | What stops one participant reading another's data? | MongoDB has no row-level security, so access rules live in the data layer: participant data is read only through functions that take the caller's identity. A student reads only their own results; a mentor reads a result only with a booking linked to it, and never sees the student's answers. Research events carry a pseudonymous `participantCode` and have no user field at all. | `npm run verify:db` (owner, other student, unbooked and booked mentor) and `npm run verify` (analytics events refuse any identifier field). |
 
@@ -29,7 +36,7 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
 | Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. After a session, students rate it from 1 to 5 stars with an optional comment; the stars count towards the mentor's rating, the comment is read only by the Pathora team. |
-| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (297 checks) and `npm run verify:db` (120 checks) pass. |
+| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (300 checks) and `npm run verify:db` (127 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. "Forgot your password?" emails a link that works once, for an hour; resetting signs the account out everywhere. The Account page lets students withdraw from the study, which deletes the account and everything recorded about them, research events included. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
@@ -67,10 +74,22 @@ https://github.com/kol-apo/Pathora
 
 ## Setting up the environment and the project
 
-### Requirements
+### Technical requirements
 
-- Node.js 18.17 or newer, with npm
-- A MongoDB database. The free tier of [MongoDB Atlas](https://www.mongodb.com/atlas) is enough
+| Requirement | Version or detail |
+| --- | --- |
+| Node.js and npm | Node.js 18.17 or newer (developed and tested on 22.20) |
+| Next.js (App Router) | 14.2 |
+| React | 18.3 |
+| TypeScript | 5.6 |
+| Tailwind CSS | 3.4 |
+| MongoDB | Atlas (the free M0 cluster is enough), through Mongoose 9.9 |
+| Auth.js (NextAuth) | 5.0.0-beta.32 |
+| zod | 4 |
+| Playwright (browser tests) | 1.64, with Chrome, Edge, Firefox and WebKit |
+| Python (prompt validator only) | 3.10 or newer |
+| Optional services | A Gemini API key (or any OpenAI-compatible AI service), a Daily API key for video, a Resend API key for email |
+| Hardware | Any machine that runs Node.js; developed on Windows 10. Students only need a modern browser on a phone or computer |
 
 ### Steps
 
@@ -127,12 +146,29 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 ### Checking that it works
 
 ```bash
-npm run verify      # 297 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
-npm run verify:db   # 120 live checks: double booking, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
+npm run verify      # 300 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
+npm run verify:db:local   # the same live checks against a throwaway database; never touches the real one
+npm run verify:db   # 127 live checks (uses MONGODB_URI; creates its own records and removes them): double booking, overlapping starts, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
+npm run test:e2e    # browser tests: real user journeys in Chrome, Edge, Firefox, WebKit (Safari's engine), an Android phone and an iPhone
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
+node tests/performance/lighthouse.mjs <site-url>   # page speed and quality on desktop, a mid-range phone and a low-end phone
 ```
+
+The browser tests start their own throwaway database and a production build of the app on port 3077, so they never touch the database in `.env.local` and can run while `npm run dev` is running. The first time, install the test browsers with `npx playwright install firefox webkit` (Chrome and Edge are used as installed). Run one browser with `npm run test:e2e -- --project="Firefox"`. A report is written to `tests/e2e/report/`.
+
+### Testing
+
+| Strategy | Where | What it covers |
+| --- | --- | --- |
+| Unit | `scripts/verify.ts` (`npm run verify`) | Pure logic with fixed inputs and edge cases: slots across timezones and daylight saving, cosine ranking, interest vectors, the availability grid, AI output parsing and fallback, feed parsing, prompt rules, video room rules |
+| Integration | `scripts/verify-db.ts` (`npm run verify:db`) | The data layer against a real MongoDB: indexes, access rules, the bridge, bookings, feedback, admin views, password resets, account deletion |
+| Concurrency | within `verify:db` | Five students book the same slot at the same instant; exactly one succeeds |
+| End-to-end, cross-browser and device | `tests/e2e/` (`npm run test:e2e`) | Sign-up and consent, discovery and the bridge, booking (including losing a slot to someone faster), cancelling, privacy of session rooms, mentor availability and confirmation, feedback and the admin pages, and that no page scrolls sideways, in six browser and device setups |
+| Performance | `tests/performance/lighthouse.mjs` | Lighthouse scores and load times on a desktop, a mid-range phone and a low-end phone |
+
+Results are in [docs/testing/](docs/testing/README.md).
 
 ## Designs
 
@@ -255,7 +291,7 @@ erDiagram
 
 ### How booking works in the application
 
-**Open slots are calculated, not stored.** A consultant's availability is saved as weekly rules in their own timezone, for example "Monday, Wednesday and Friday, 09:00 to 12:00 and 14:00 to 17:00, Africa/Lagos", plus any specific dates that differ: a day off, or different hours for that one date, which replace the weekly hours for that day. When a student opens the booking card, `lib/booking/slots.ts` walks the coming days, cuts each window into 45-minute sessions with a 15-minute gap, converts each time to UTC and removes anything that is too soon, too far ahead or already booked. The browser then shows each time in the student's own timezone.
+**Open slots are calculated, not stored.** A consultant's availability is saved as weekly rules in their own timezone, for example "Monday, Wednesday and Friday, 09:00 to 12:00 and 14:00 to 17:00, Africa/Lagos", plus any specific dates that differ: a day off, or different hours for that one date, which replace the weekly hours for that day. When a student opens the booking card, `lib/booking/slots.ts` walks the coming days, offers a 45-minute session at every quarter hour that fits inside each window (13:00, 13:15, 13:30, 13:45), drops any that would overlap a booking or the 15-minute break around it, converts each time to UTC and removes anything that is too soon, too far ahead or already booked. The browser then shows each time in the student's own timezone.
 
 **Double-booking is blocked twice.**
 
@@ -264,9 +300,11 @@ erDiagram
 
 A cancelled booking is no longer active, so its slot can be booked again.
 
-## Deployment plan
+## Deployment
 
-The app is not deployed yet. The plan uses two free-tier services:
+The app is deployed on Vercel, with the database on MongoDB Atlas. Every push to `main` redeploys it. A Vercel Cron job (`vercel.json`) reads the opportunity feeds every day at 06:00 UTC, through `/api/cron/opportunities`, which runs only with the `CRON_SECRET`. The AI and feed routes are allowed 60 seconds (`maxDuration`), because Vercel stops functions after 10 seconds by default.
+
+The setup uses two free-tier services:
 
 | Part | Service | Why |
 | --- | --- | --- |
@@ -278,7 +316,7 @@ Steps:
 1. Create the Atlas cluster and a database user, and allow connections from anywhere (`0.0.0.0/0`), because Vercel's servers do not have fixed IP addresses.
 2. Run `npm run seed` once from a local machine against the Atlas connection string, to load the data and build the indexes.
 3. Import the GitHub repository into Vercel. It detects Next.js and needs no build configuration.
-4. In the Vercel project settings, add the environment variables: `MONGODB_URI`, `AUTH_SECRET`, the Google keys if used, and the `AI_*` variables if a live AI model is used.
+4. In the Vercel project settings, add the environment variables: `MONGODB_URI`, `AUTH_SECRET`, `APP_URL`, `CRON_SECRET`, `DAILY_API_KEY`, the Google keys if used, and the `AI_*` variables if a live AI model is used.
 5. Deploy. Every later push to `main` redeploys automatically.
 
 Also add `AUTH_SECRET` (and the Google keys, if used) in Vercel. For Google sign-in, add the deployed address's callback, `https://<your-domain>/api/auth/callback/google`, to the Google client's authorised redirect URIs. Also add `DAILY_API_KEY` for live video.
@@ -291,12 +329,16 @@ https://youtu.be/562JOBwNsII
 
 ```
 app/                        Pages and API routes (Next.js App Router)
-  page.tsx                  Landing page
-  explore/                  Browse consultants
-  consultants/[id]/         Consultant profile and booking
-  discover/                 Career Discovery: chat with the Pathora Guide, then results
-  dashboard/                Student dashboard
-  session/[id]/             Session room
+  page.tsx                  Landing page (the only public page)
+  (student)/                The signed-in student app, one shared layout:
+    dashboard/              Overview
+    explore/                Browse mentors
+    consultants/[id]/       Mentor profile and booking
+    discover/               Career Discovery: Pathy's questions, the result, then the chat
+    opportunities/          Scholarships, fellowships, internships and jobs
+    sessions/               Today, coming up and past sessions; join, cancel, rate
+  session/[id]/             The live video session room (Daily)
+  account/                  Account details; withdraw and delete
   signin/, signup/          Sign-in and sign-up
   welcome/                  Research consent, shown once after sign-up
   become-a-mentor/          Mentor application
@@ -313,31 +355,50 @@ app/                        Pages and API routes (Next.js App Router)
     consent/                POST   record research consent
     mentor/                 POST   apply; PUT weekly hours and specific dates; POST confirm or decline a booking
     admin/mentors/[id]/     POST   approve, reject, suspend or reinstate a mentor
+    admin/opportunities/    POST   add, hide or refresh opportunity listings
+    bookings/[id]/cancel/   POST   a student cancels a session
+    bookings/[id]/rate/     POST   a student rates a past session
+    sessions/[id]/join/     POST   get a pass into the video room (the booking's two people only)
+    sessions/[id]/leave/    POST   record the call's timings from Daily
+    pathy/                  POST   one reply from Pathy, the chatbot
+    cron/opportunities/     GET    daily feed refresh (needs CRON_SECRET)
+    password/forgot, reset  POST   forgot-password and reset
+    account/delete/         POST   withdraw and delete an account
 components/                 Interface components
   auth/                     Sign-in, sign-up and consent forms
   console/                  Mentor and admin console pieces
-  brand/                    The Pathora Guide character
+  brand/                    Pathy, the guide character
   landing/                  Landing page hero and sections
   consultant/               Consultant cards, sector filter, booking panel
-  discover/                 Discovery chat, progress bar, results
-  dashboard/, layout/, opportunities/, ui/
+  discover/                 Discovery chat, progress bar, results, the bridge section
+  pathy/                    Pathy's discovery experience and chat
+  sessions/                 Sessions list, video room, rating form
+  account/, dashboard/, layout/, opportunities/, ui/
 lib/
   ai/                       Discovery agent: prompt, AI provider, output validation, offline fallback
-  booking/                  Slot generation and timezone handling
+  booking/                  Slot generation, timezone handling, the availability hour grid
   matching/                 Interest vectors, cosine similarity, bridge ranking
-  research/                 The verified resource catalogue (allow-list)
+  research/                 The verified resource catalogue (allow-list), participant codes, consent text
+  opportunities/            RSS feed reading, deadline, type and sector rules
+  video/                    The Daily client: rooms, passes, call records
+  email/                    Sending email through Resend
+  auth/                     Role guards and the password rule
   db/
-    models/                 The eleven Mongoose models and their indexes
-    queries/                Mentors, slots, bookings, the bridge, access rules, research reports
+    models/                 The twelve Mongoose models and their indexes
+    queries/                The data layer: mentors, bookings, the bridge, access rules, feedback, admin views, research reports
     connect.ts              Database connection
   discovery/                The six questions and answer validation
-  data.ts                   Sample data, used for seeding and for pages not yet on the database
+  data.ts                   Sample content: seed data and the offline matcher's career profiles
 scripts/
   seed.ts                   Loads the database and builds the indexes
   verify.ts                 Offline test suite
   verify-db.ts              Live database test suite
   report.ts                 Research reports
   make-admin.ts             Promotes an existing account to admin
+tests/
+  e2e/                      Browser tests (Playwright): journeys, privacy, layout in six browsers and devices
+  performance/              Lighthouse speed and quality measurements
+playwright.config.ts        The browsers and devices the browser tests run on
 prompts/
   discovery.json            The versioned prompt specification: prompt, output contract, validators
   validate_prompt.py        Offline validator for the specification (no API key needed)

@@ -10,6 +10,10 @@ service-account*.json
 # Dependencies and build output
 node_modules
 .next
+.next-e2e
+test-results
+tests/e2e/report
+playwright-report
 out
 dist
 dist-ssr

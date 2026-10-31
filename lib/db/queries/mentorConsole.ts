@@ -134,7 +134,7 @@ export const DATE_HOURS_MAX_DAYS_AHEAD = 365;
  * still has to be confirmed by the mentor, so very short notice suits mentors
  * who check often (and testing).
  */
-export const NOTICE_HOURS = [0.5, 1, 3, 12, 24, 48] as const;
+export const NOTICE_HOURS = [10 / 60, 0.5, 1, 3, 12, 24, 48] as const;
 
 export interface MyAvailability {
   weekly: WeeklyWindow[];

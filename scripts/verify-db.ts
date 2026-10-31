@@ -252,6 +252,65 @@ async function main() {
       );
     }
 
+    console.log('\n── Overlapping quarter-hour starts ────────────────────────');
+    {
+      // Sessions can start every 15 minutes, so a clash need not share a start time.
+      await Booking.syncIndexes();
+      const overlapIdx = (await Booking.collection.indexes()).find((i) => i.name === 'no_overlapping_active_bookings');
+      ok('the overlap index exists, unique and partial on active bookings', overlapIdx?.unique === true && !!overlapIdx.partialFilterExpression);
+
+      const open = await listAvailableSlots(String(mentor._id));
+      const startSet = new Set(open.map((sl) => sl.startsAt));
+      const first = open.find((sl) =>
+        [15, 30, 45].every((m) => startSet.has(new Date(Date.parse(sl.startsAt) + m * 60_000).toISOString())),
+      );
+      ok('a mentor offers starts 15 minutes apart', !!first);
+      const starts = [0, 15, 30, 45].map((m) => new Date(Date.parse(first!.startsAt) + m * 60_000));
+
+      // Four students try four different, overlapping start times at the same instant.
+      const raced = await Promise.allSettled(
+        starts.map((startsAt, i) =>
+          createBooking({ studentId: String(students[i]._id), mentorId: String(mentor._id), startsAt, topic: 'Overlap race' }),
+        ),
+      );
+      const won = raced.filter((r) => r.status === 'fulfilled');
+      ok('exactly one of four overlapping bookings succeeded', won.length === 1, `${won.length} succeeded`);
+      ok(
+        'the others were refused cleanly',
+        raced.every(
+          (r) =>
+            r.status === 'fulfilled' ||
+            (r.reason instanceof DataError && ['SLOT_TAKEN', 'SLOT_UNAVAILABLE'].includes(r.reason.code)),
+        ),
+      );
+
+      // The database alone, with the code's own check skipped: still refused.
+      let refusedByDb = false;
+      try {
+        await Booking.create({
+          student: students[4]._id,
+          mentor: mentor._id,
+          topic: 'Straight to the database',
+          startsAt: new Date(starts[0].getTime() + 30 * 60_000),
+          endsAt: new Date(starts[0].getTime() + 75 * 60_000),
+          status: 'pending',
+        });
+      } catch (err) {
+        refusedByDb = (err as { code?: number }).code === 11000;
+      }
+      ok('the database itself refuses an overlapping booking at a different start time', refusedByDb);
+
+      const after = new Set((await listAvailableSlots(String(mentor._id))).map((sl) => sl.startsAt));
+      const winner = (won[0] as PromiseFulfilledResult<{ startsAt: string }>).value.startsAt;
+      const wt = Date.parse(winner);
+      ok(
+        'starts that overlap the booking or its break are no longer offered',
+        [-45, -30, -15, 0, 15, 30, 45].every((m) => !after.has(new Date(wt + m * 60_000).toISOString())),
+      );
+      // Clear it, so the tests below see the mentor's normal week.
+      await Booking.deleteMany({ mentor: mentor._id, topic: 'Overlap race' });
+    }
+
     console.log('\n── Bridge: a result reaches three people ──────────────────');
     const studentVector = [0.88, 0.65, 0.2, 0.1, 0.3];
     const result = await DiscoveryResult.create({
@@ -523,8 +582,9 @@ async function main() {
         JSON.stringify(preview.mentors.map((m) => m.id)) === JSON.stringify(saved.bridge.mentors.map((m) => m.id)),
     );
     console.log('\n── Session outcomes ───────────────────────────────────────');
-    // A confirmed session that started an hour ago, and one next week.
-    const hourAgo = new Date(Date.now() - 3_600_000);
+    // A confirmed session that started two hours ago, and one next week.
+    // Two hours ago, so its time (and the break after it) is clear of the video test's session.
+    const hourAgo = new Date(Date.now() - 2 * 3_600_000);
     const [held, future] = await Booking.create([
       {
         student: students[2]._id,
@@ -757,10 +817,11 @@ async function main() {
           .map((sl) =>
             new Date(sl.startsAt).toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }),
           );
-      ok("a date's own hours replace that weekday's hours", localTimes(monday).join(',') === '13:00,14:00', localTimes(monday).join(','));
+      ok("a date's own hours replace that weekday's hours", localTimes(monday).join(',') === '13:00,13:15,13:30,13:45,14:00,14:15', localTimes(monday).join(','));
       ok('a day off offers no slots', localTimes(tuesday).length === 0);
-      ok('a usually free weekend date can be opened', localTimes(saturday).join(',') === '10:00,11:00', localTimes(saturday).join(','));
-      ok('other weekdays keep their weekly hours', localTimes(addDays(monday, 2)).length === 8);
+      ok('a usually free weekend date can be opened', localTimes(saturday).join(',') === '10:00,10:15,10:30,10:45,11:00,11:15', localTimes(saturday).join(','));
+      // 09:00–17:00: a start every 15 minutes from 09:00 to 16:15.
+      ok('other weekdays keep their weekly hours', localTimes(addDays(monday, 2)).length === 30);
 
       const mine = await getMyAvailability(uid);
       ok(
@@ -812,6 +873,8 @@ async function main() {
         badNotice = err instanceof DataError && err.code === 'INVALID_AVAILABILITY';
       }
       ok('a notice period outside the list is refused', badNotice);
+      await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, noticeHours: 10 / 60 });
+      ok('10 minutes is an allowed notice period', (await getMyAvailability(uid))?.noticeHours === 10 / 60);
       ok('the mentor is shown as approved', later?.status === 'approved');
 
       await updateMyAvailability(uid, { acceptingBookings: true, weekly: weekdays, dates: [] });
@@ -820,7 +883,7 @@ async function main() {
       );
       ok(
         'removing every date returns to weekly hours',
-        (await getMyAvailability(uid))?.dates.length === 0 && tuesdayAgain.length === 8,
+        (await getMyAvailability(uid))?.dates.length === 0 && tuesdayAgain.length === 30,
       );
     } finally {
       await Availability.deleteMany({ mentor: datesMentor._id });

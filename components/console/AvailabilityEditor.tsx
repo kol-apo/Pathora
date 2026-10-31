@@ -41,6 +41,7 @@ const MAX_DAYS_AHEAD = 365;
 
 /** Must match NOTICE_HOURS in lib/db/queries/mentorConsole.ts. */
 const NOTICE_OPTIONS = [
+  { hours: 10 / 60, label: '10 minutes' },
   { hours: 0.5, label: '30 minutes' },
   { hours: 1, label: '1 hour' },
   { hours: 3, label: '3 hours' },
@@ -203,7 +204,7 @@ export default function AvailabilityEditor({
     setMessage(null);
     setWeek((w) => ({ ...w, [dow]: toggle(w[dow], m, on) }));
   };
-  const sessionsPerWeek = DAYS.reduce((n, { dow }) => n + week[dow].length, 0);
+  const hoursPerWeek = DAYS.reduce((n, { dow }) => n + week[dow].length, 0);
 
   // ── Specific dates ─────────────────────────────────────────────────────────
   const lastDay = addDays(today, MAX_DAYS_AHEAD);
@@ -346,7 +347,7 @@ export default function AvailabilityEditor({
           <div>
             <h2 className="text-[15px] font-semibold text-ink">1. Your usual week</h2>
             <p className="mt-0.5 text-[13px] text-muted">
-              Tap the hours you are free. Each hour is one 45-minute session. Times are in {timezone}.
+              Tap the hours you are free. Students can start a 45-minute session at any quarter hour inside them (13:00, 13:15, 13:30, 13:45), with a 15-minute break kept after each. Times are in {timezone}.
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -409,9 +410,9 @@ export default function AvailabilityEditor({
             ))}
           </div>
           <p className="mt-3 text-[13px] text-muted">
-            {sessionsPerWeek === 0
+            {hoursPerWeek === 0
               ? 'No hours yet. Students cannot book you until you add some.'
-              : `${sessionsPerWeek} session${sessionsPerWeek === 1 ? '' : 's'} a week.`}
+              : `${hoursPerWeek} free hour${hoursPerWeek === 1 ? '' : 's'} a week.`}
           </p>
         </div>
       </section>
@@ -531,7 +532,7 @@ export default function AvailabilityEditor({
                             {label(date, { weekday: 'short', day: 'numeric', month: 'short' })}
                             <span className="text-muted">
                               {' · '}
-                              {o.blocked ? 'Day off' : `${o.starts.length} session${o.starts.length === 1 ? '' : 's'}`}
+                              {o.blocked ? 'Day off' : `${o.starts.length} free hour${o.starts.length === 1 ? '' : 's'}`}
                             </span>
                           </button>
                         </li>

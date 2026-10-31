@@ -276,7 +276,12 @@ export default function BookingPanel({
               </div>
 
               <p className="mt-4 text-micro uppercase text-muted">Pick a time</p>
-              <div className="mt-2.5 grid grid-cols-3 gap-2" role="listbox" aria-label="Available times">
+              {/* Four starts an hour (every 15 minutes), so each hour reads as one row. */}
+              <div
+                className="-mx-1 mt-2.5 grid max-h-[264px] grid-cols-4 gap-2 overflow-y-auto px-1 py-0.5"
+                role="listbox"
+                aria-label="Available times"
+              >
                 {daySlots.map((s) => {
                   const active = selected?.startsAt.getTime() === s.startsAt.getTime();
                   return (

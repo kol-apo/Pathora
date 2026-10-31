@@ -82,7 +82,7 @@ Indexes: `{ student, createdAt }`; `primary.sector`; `promptVersion`.
 | `discoveryResult`, `viaBridge` | A bridge booking must reference the discovery result it came from |
 | `cancelledAt` | Stamped automatically when a booking is cancelled |
 
-Indexes: `one_active_booking_per_slot`, a unique index on `{ mentor, startsAt }` that only counts active bookings; `{ student, startsAt }`; `{ mentor, status, startsAt }`; `discoveryResult` for bridge bookings.
+Indexes: `one_active_booking_per_slot`, a unique index on `{ mentor, startsAt }` that only counts active bookings; `no_overlapping_active_bookings`, a unique index on `{ mentor, blocks }` over the 15-minute blocks each active booking covers, including the break after it; `{ student, startsAt }`; `{ mentor, status, startsAt }`; `discoveryResult` for bridge bookings.
 
 ### `BridgeRecommendation`
 
@@ -123,7 +123,7 @@ One per booking (`booking` is unique), created the first time someone joins. It 
 Two layers, both needed:
 
 1. **Validation.** Before saving, `createBooking` regenerates the mentor's open slots and checks the requested time is one of them. This rejects a made-up time, such as 3am, or a slot already taken.
-2. **The database.** The unique index `one_active_booking_per_slot` allows only one active booking per mentor and start time. If two requests pass the first check at the same instant, MongoDB rejects the second write, and the student sees "Someone just booked that slot" instead of an error.
+2. **The database.** Sessions can start every 15 minutes, so a clash need not share a start time. Each booking stores the 15-minute blocks it covers (its 45 minutes plus the 15-minute break, derived by a pre-validate hook), and the unique index `no_overlapping_active_bookings` allows each mentor's block to belong to only one active booking; `one_active_booking_per_slot` still guards identical start times. If two requests pass the first check at the same instant, MongoDB rejects the second write, and the student sees "Someone just booked that slot" instead of an error.
 
 Layer 1 alone has a race window between checking and writing; layer 2 alone would accept a 3am booking. A cancelled booking is no longer active, so its slot can be booked again.
 

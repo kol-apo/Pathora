@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { messageForError } from './messages';
+import { useHydrated } from '@/components/ui/useHydrated';
 
 function ErrorBox({ message }: { message: string }) {
   return (
@@ -100,10 +101,12 @@ function PasswordField({
 }
 
 function SubmitButton({ busy, children }: { busy: boolean; children: React.ReactNode }) {
+  // Disabled until the page is ready, so an early press cannot reload the form.
+  const hydrated = useHydrated();
   return (
     <button
       type="submit"
-      disabled={busy}
+      disabled={busy || !hydrated}
       className="flex h-12 w-full items-center justify-center gap-2 rounded bg-navy text-[15px] font-medium text-white transition-colors hover:bg-navy-deep disabled:opacity-60"
     >
       {busy && <Loader2 size={17} className="animate-spin" />}

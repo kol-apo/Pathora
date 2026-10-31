@@ -1,10 +1,13 @@
 /**
- * The availability editor shows hours as tappable start times: each one is a
- * session students can book. These helpers convert between those start times
- * and the windows that are stored (see `lib/booking/slots.ts`).
+ * The availability editor shows a mentor's free time as tappable hours. These
+ * helpers convert between those hours and the windows that are stored: runs of
+ * neighbouring hours become one window (10:00, 11:00, 12:00 → 10:00–13:00).
+ * Students can then start a session at any quarter hour inside a window, as
+ * long as it ends by the window's end (see `lib/booking/slots.ts`).
  *
- * A window produces a session at its start, then one every `step` minutes
- * (45-minute session + 15-minute break = 60), while the session still fits.
+ * `startsFromWindows` reads windows back as hours: an hour is shown as free
+ * from the window's start and every hour after it, while a 45-minute session
+ * still fits.
  */
 
 export interface TimeWindow {
