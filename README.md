@@ -6,7 +6,7 @@ Pathora is a Next.js application on **MongoDB**. The same database holds the app
 
 | | |
 | --- | --- |
-| Live site | _add the Vercel link_ |
+| Live site | https://usepathora.vercel.app |
 | Walkthrough video | _add the link_ |
 | Technical report (PDF) | _add the link_ |
 | Testing, performance and compatibility results | [docs/testing/](docs/testing/README.md) |
@@ -86,7 +86,7 @@ https://github.com/kol-apo/Pathora
 | MongoDB | Atlas (the free M0 cluster is enough), through Mongoose 9.9 |
 | Auth.js (NextAuth) | 5.0.0-beta.32 |
 | zod | 4 |
-| Playwright (browser tests) | 1.64, with Chrome, Edge, Firefox and WebKit |
+| Playwright (browser tests) | 1.64, with Chrome, Edge and Firefox (WebKit optional) |
 | Python (prompt validator only) | 3.10 or newer |
 | Optional services | A Gemini API key (or any OpenAI-compatible AI service), a Daily API key for video, a Resend API key for email |
 | Hardware | Any machine that runs Node.js; developed on Windows 10. Students only need a modern browser on a phone or computer |
@@ -149,14 +149,14 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 npm run verify      # 300 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
 npm run verify:db:local   # the same live checks against a throwaway database; never touches the real one
 npm run verify:db   # 127 live checks (uses MONGODB_URI; creates its own records and removes them): double booking, overlapping starts, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
-npm run test:e2e    # browser tests: real user journeys in Chrome, Edge, Firefox, WebKit (Safari's engine), an Android phone and an iPhone
+npm run test:e2e    # browser tests: real user journeys in Chrome, Edge, Firefox and an Android phone (add E2E_WEBKIT=1 for WebKit)
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
 npm run build       # production build
 node tests/performance/lighthouse.mjs <site-url>   # page speed and quality on desktop, a mid-range phone and a low-end phone
 ```
 
-The browser tests start their own throwaway database and a production build of the app on port 3077, so they never touch the database in `.env.local` and can run while `npm run dev` is running. The first time, install the test browsers with `npx playwright install firefox webkit` (Chrome and Edge are used as installed). Run one browser with `npm run test:e2e -- --project="Firefox"`. A report is written to `tests/e2e/report/`.
+The browser tests start their own throwaway database and a production build of the app on port 3077, so they never touch the database in `.env.local` and can run while `npm run dev` is running. The first time, install Firefox for the tests with `npx playwright install firefox` (Chrome and Edge are used as installed; `webkit` too if you set `E2E_WEBKIT=1`). Run one browser with `npm run test:e2e -- --project="Firefox"`. A report is written to `tests/e2e/report/`.
 
 ### Testing
 
@@ -165,7 +165,7 @@ The browser tests start their own throwaway database and a production build of t
 | Unit | `scripts/verify.ts` (`npm run verify`) | Pure logic with fixed inputs and edge cases: slots across timezones and daylight saving, cosine ranking, interest vectors, the availability grid, AI output parsing and fallback, feed parsing, prompt rules, video room rules |
 | Integration | `scripts/verify-db.ts` (`npm run verify:db`) | The data layer against a real MongoDB: indexes, access rules, the bridge, bookings, feedback, admin views, password resets, account deletion |
 | Concurrency | within `verify:db` | Five students book the same slot at the same instant; exactly one succeeds |
-| End-to-end, cross-browser and device | `tests/e2e/` (`npm run test:e2e`) | Sign-up and consent, discovery and the bridge, booking (including losing a slot to someone faster), cancelling, privacy of session rooms, mentor availability and confirmation, feedback and the admin pages, and that no page scrolls sideways, in six browser and device setups |
+| End-to-end, cross-browser and device | `tests/e2e/` (`npm run test:e2e`) | Sign-up and consent, discovery and the bridge, booking (including losing a slot to someone faster), cancelling, privacy of session rooms, mentor availability and confirmation, feedback and the admin pages, and that no page scrolls sideways, in Chrome, Edge, Firefox and an Android phone |
 | Performance | `tests/performance/lighthouse.mjs` | Lighthouse scores and load times on a desktop, a mid-range phone and a low-end phone |
 
 Results are in [docs/testing/](docs/testing/README.md).
@@ -396,7 +396,7 @@ scripts/
   report.ts                 Research reports
   make-admin.ts             Promotes an existing account to admin
 tests/
-  e2e/                      Browser tests (Playwright): journeys, privacy, layout in six browsers and devices
+  e2e/                      Browser tests (Playwright): journeys, privacy and layout in four browsers and devices
   performance/              Lighthouse speed and quality measurements
 playwright.config.ts        The browsers and devices the browser tests run on
 prompts/

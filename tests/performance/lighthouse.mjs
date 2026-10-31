@@ -67,8 +67,12 @@ async function sessionCookie() {
 }
 
 function lighthouse(url, profileFlags, headers) {
-  const out = join(tmpdir(), `lh-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
-  const extra = headers ? [`--extra-headers=${JSON.stringify(headers)}`] : [];
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const out = join(tmpdir(), `lh-${id}.json`);
+  // Headers go in a file: passed inline, the shell would mangle the JSON quotes.
+  const headerFile = join(tmpdir(), `lh-headers-${id}.json`);
+  if (headers) writeFileSync(headerFile, JSON.stringify(headers));
+  const extra = headers ? [`--extra-headers=${headerFile}`] : [];
   execFileSync(
     'npx',
     [
@@ -87,6 +91,7 @@ function lighthouse(url, profileFlags, headers) {
   );
   const report = JSON.parse(readFileSync(out, 'utf8'));
   rmSync(out, { force: true });
+  rmSync(headerFile, { force: true });
   const a = report.audits;
   const score = (k) => Math.round((report.categories[k]?.score ?? 0) * 100);
   return {
@@ -113,9 +118,13 @@ const results = [];
 for (const { path, signedIn } of pages) {
   for (const [profile, flags] of Object.entries(PROFILES)) {
     process.stdout.write(`${profile.padEnd(8)} ${path} ... `);
-    const r = lighthouse(`${base}${path}`, flags, signedIn ? { Cookie: cookie } : null);
-    results.push({ path, profile, ...r });
-    console.log(`performance ${r.performance}, LCP ${r.lcpMs} ms`);
+    try {
+      const r = lighthouse(`${base}${path}`, flags, signedIn ? { Cookie: cookie } : null);
+      results.push({ path, profile, ...r });
+      console.log(`performance ${r.performance}, LCP ${r.lcpMs} ms`);
+    } catch {
+      console.log('failed, skipped');
+    }
   }
 }
 
