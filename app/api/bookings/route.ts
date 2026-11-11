@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { notifyBooking } from '@/lib/db/queries/notifications';
 import { z } from 'zod';
 import { bookingStudyDetails, createBooking, listBookingsForStudent, logStudentEvent } from '@/lib/db/queries';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
@@ -30,6 +31,8 @@ const CreateSchema = z.object({
   /** Set when the student came from one of the three mentors on their result. */
   discoveryResultId: z.string().min(1).optional(),
   viaBridge: z.boolean().optional(),
+  /** The browser's timezone, so email times can be in the student's own time. */
+  timeZone: z.string().max(64).optional(),
 });
 
 export async function POST(request: Request) {
@@ -64,10 +67,13 @@ export async function POST(request: Request) {
       topic: parsed.data.topic,
       discoveryResultId: parsed.data.discoveryResultId,
       viaBridge: parsed.data.viaBridge === true,
+      studentTimeZone: parsed.data.timeZone,
     });
     // The booking is made; a research-log failure must not turn it into an error.
     const details = await bookingStudyDetails(booking).catch(() => null);
     if (details) await logStudentEvent(student.id, { type: 'booking_requested', payload: details });
+    // Tell the mentor. Never throws: a mail problem must not undo the booking.
+    await notifyBooking(booking.id, 'requested');
     return NextResponse.json({ booking }, { status: 201 });
   } catch (err) {
     if (err instanceof DataError) {

@@ -36,7 +36,7 @@ Run the checks with `npm run verify` and `npm run verify:db`, the research repor
 | Pathy, the chatbot | After the six questions, students keep talking to Pathy about their direction, roadmap, applications, opportunities and mentors. Each reply is built from their saved answers and result, their three mentors, open opportunities and the verified programmes; Pathy may name only those, stays on careers, and recommends no courses. Conversations stay in the student's browser for 24 hours and are never stored on the server; the research log records only that a message was sent. 60 messages per student per day. |
 | Opportunities | Read from four publishers' RSS feeds (Opportunities for Africans, Opportunity Desk, Opportunities for Youth, Youth Opportunities Hub) with `npm run fetch-opportunities`, or on a schedule once deployed. ALU SPD listings are added by an admin at `/admin/opportunities`. Each listing links to the publisher's page. |
 | Sessions | A page with today's sessions, those coming up (cancellable) and past ones, in the student's own timezone. After a session, students rate it from 1 to 5 stars with an optional comment; the stars count towards the mentor's rating, the comment is read only by the Pathora team. |
-| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (311 checks) and `npm run verify:db` (136 checks) pass. |
+| Data layer (MongoDB) | Built and tested: 12 collections, the bridge, access rules and research reports. `npm run verify` (332 checks) and `npm run verify:db` (143 checks) pass. |
 | Sign-in and roles | Built with Auth.js: email and password, and Google once its keys are set. Sign-up creates a student, who agrees to the research consent and gets a participant code. Mentors join by applying; admins are promoted with `npm run make-admin`. "Forgot your password?" emails a link that works once, for an hour; resetting signs the account out everywhere. The Account page lets students withdraw from the study, which deletes the account and everything recorded about them, research events included. |
 | Partner mentors | Nine mentors from JointHub's directory, listed with `npm run import-jointhub` and marked "JointHub" on their cards and profiles. They are not taking bookings yet: their weekly hours are needed first, and nobody can sign in as them until they claim their account. |
 | Mentor console (`/mentor`) | Built: application status, booking requests to confirm or decline, marking past sessions as held or not (which feeds the session-completion measure), a weekly-hours editor, and profile links (LinkedIn, X, portfolio, publications, videos) shown on their public profile. Mentors apply at `/become-a-mentor`. |
@@ -139,7 +139,8 @@ https://github.com/kol-apo/Pathora
 | `DAILY_API_KEY` | For live video | From the Daily dashboard (Developers). Server only, never sent to the browser. Daily needs a payment method on the account before calls work, even on the free tier (10,000 minutes a month) |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | For mentor photos | From the Cloudinary console. Mentors upload their headshot straight to Cloudinary with a one-time signature from the server; the secret never reaches the browser. Without them, mentors' initials are shown |
 | `CRON_SECRET` | Only when deployed | Lets a scheduler call `/api/cron/opportunities` to read the opportunity feeds |
-| `RESEND_API_KEY`, `EMAIL_FROM` | For email | Resend sends password-reset emails. Without a key, emails are printed in the terminal during development. Until a domain is verified in Resend, it only delivers to your own Resend address |
+| `BREVO_API_KEY`, `EMAIL_FROM` | For email | Brevo's free plan (300 emails a day, no domain needed) sends password resets and booking emails: a new request to the mentor, confirmed or declined to the student, a cancellation to the mentor, and a reminder to both on the day. `EMAIL_FROM` must be an address verified in Brevo. Without a key, emails are printed in the terminal during development |
+| `RESEND_API_KEY` | Alternative to Brevo | Used only when no Brevo key is set. Needs a verified domain to email anyone but the account owner; the planned upgrade once Pathora has its own domain |
 | `APP_URL` | When deployed | The site's address, used in emailed links (for example `https://pathora.vercel.app`). Never taken from the request, so a link cannot be pointed at another site |
 
 The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` it scores the answers offline, and the same offline scoring is the fallback if a live model fails.
@@ -148,9 +149,9 @@ The discovery questionnaire works without any AI key. With `AI_PROVIDER="mock"` 
 
 ```bash
 npm run lint        # ESLint (Next.js and TypeScript rules) over app, components, lib, scripts and tests
-npm run verify      # 311 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
+npm run verify      # 332 offline checks: slots, timezones, matching, interest vectors, model rules, accounts, AI output, opportunity feeds, Pathy's prompt. No database needed
 npm run verify:db:local   # the same live checks against a throwaway database; never touches the real one
-npm run verify:db   # 136 live checks (uses MONGODB_URI; creates its own records and removes them): double booking, overlapping starts, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
+npm run verify:db   # 143 live checks (uses MONGODB_URI; creates its own records and removes them): double booking, overlapping starts, date-specific hours, session feedback, admin views, the bridge, saving results, cancelling, session outcomes, video rooms, password resets, account deletion, access rules, research events, opportunities, reports
 npm run test:e2e    # browser tests: real user journeys in Chrome, Edge, Firefox and an Android phone (add E2E_WEBKIT=1 for WebKit)
 npm run report      # research reports: bridge conversion, output validity, session completion
 npm run make-admin -- you@example.com   # promote an existing account to admin
@@ -305,7 +306,7 @@ A cancelled booking is no longer active, so its slot can be booked again.
 
 ## Deployment
 
-The app is deployed on Vercel, with the database on MongoDB Atlas. Every push to `main` redeploys it. A Vercel Cron job (`vercel.json`) reads the opportunity feeds every day at 06:00 UTC, through `/api/cron/opportunities`, which runs only with the `CRON_SECRET`. The AI and feed routes are allowed 60 seconds (`maxDuration`), because Vercel stops functions after 10 seconds by default.
+The app is deployed on Vercel, with the database on MongoDB Atlas. Every push to `main` redeploys it. Two Vercel Cron jobs (`vercel.json`) run daily: session reminder emails at 05:00 UTC (`/api/cron/reminders`) and the opportunity feeds at 06:00 UTC (`/api/cron/opportunities`). Both run only with the `CRON_SECRET`. The AI and feed routes are allowed 60 seconds (`maxDuration`), because Vercel stops functions after 10 seconds by default.
 
 The setup uses two free-tier services:
 
@@ -370,6 +371,7 @@ app/                        Pages and API routes (Next.js App Router)
     pathy/                  POST   one reply from Pathy, the chatbot
     mentor/photo/           POST   sign a photo upload; PUT save it; DELETE remove it
     cron/opportunities/     GET    daily feed refresh (needs CRON_SECRET)
+    cron/reminders/         GET    daily session reminder emails (needs CRON_SECRET)
     password/forgot, reset  POST   forgot-password and reset
     account/delete/         POST   withdraw and delete an account
 components/                 Interface components
@@ -389,7 +391,7 @@ lib/
   research/                 The verified resource catalogue (allow-list), participant codes, consent text
   opportunities/            RSS feed reading, deadline, type and sector rules
   video/                    The Daily client: rooms, passes, call records
-  email/                    Sending email through Resend
+  email/                    Sending email (Brevo, or Resend) and the words of each booking email
   media/                    Mentor photos on Cloudinary: upload signatures, addresses, deletion
   auth/                     Role guards and the password rule
   db/

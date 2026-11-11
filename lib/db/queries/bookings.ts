@@ -3,6 +3,7 @@ import dbConnect from '../connect';
 import { Availability, Booking, BridgeRecommendation, DiscoveryResult, MentorProfile } from '../models';
 import { ACTIVE_BOOKING_STATUSES, type BookingStatus } from '../models/Booking';
 import { findSlot } from '@/lib/booking/slots';
+import { isValidTimeZone } from '@/lib/booking/timezone';
 import type { Sector } from '@/lib/types';
 import { DataError, isDuplicateKeyError } from './errors';
 import { busyIntervalsFor } from './mentors';
@@ -19,6 +20,8 @@ export interface CreateBookingInput {
   discoveryResultId?: string;
   /** Booked from a mentor surfaced on that result. Requires discoveryResultId. */
   viaBridge?: boolean;
+  /** The student's timezone, from their browser; ignored unless it is a real one. */
+  studentTimeZone?: string;
   now?: Date;
 }
 
@@ -113,6 +116,7 @@ export async function createBooking(input: CreateBookingInput): Promise<BookingD
       status: 'pending',
       discoveryResult: discoveryResultId,
       viaBridge,
+      studentTimeZone: input.studentTimeZone && isValidTimeZone(input.studentTimeZone) ? input.studentTimeZone : undefined,
     });
 
     if (viaBridge) {

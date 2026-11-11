@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { bookingStudyDetails, cancelBookingForStudent } from '@/lib/db/queries/bookings';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
 import { logStudentEvent } from '@/lib/db/queries/research';
+import { notifyBooking } from '@/lib/db/queries/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
         },
       });
     }
+    // Tell the mentor the time is free again. Never throws.
+    await notifyBooking(booking.id, 'cancelled_by_student');
     return NextResponse.json({ booking });
   } catch (err) {
     if (err instanceof DataError) {

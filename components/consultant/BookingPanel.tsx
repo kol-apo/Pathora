@@ -103,6 +103,7 @@ export default function BookingPanel({
           // Sent back exactly as received — the server matches it to a slot start.
           startsAt: selected.startsAt.toISOString(),
           topic: topic.trim() || DEFAULT_TOPIC,
+          timeZone: studentZone(),
           ...(bridgeResultId ? { discoveryResultId: bridgeResultId, viaBridge: true } : {}),
         }),
       });

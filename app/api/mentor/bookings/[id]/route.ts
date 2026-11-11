@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireRole } from '@/lib/auth/guard';
 import { respondToBooking } from '@/lib/db/queries/mentorConsole';
 import { logStudentEvent } from '@/lib/db/queries/research';
+import { notifyBooking } from '@/lib/db/queries/notifications';
 import { DataError, statusForError } from '@/lib/db/queries/errors';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
   try {
     const action = parsed.data.action;
     const done = await respondToBooking(guard.userId, params.id, action);
+    // Tell the student. Never throws.
+    if (action === 'confirm') await notifyBooking(params.id, 'confirmed');
+    if (action === 'decline') await notifyBooking(params.id, 'declined');
     if (action === 'complete' || action === 'no_show') {
       await logStudentEvent(done.studentId, {
         type: 'session_outcome',

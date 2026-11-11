@@ -82,6 +82,11 @@ export interface IBooking {
   /** Derived from startsAt and endsAt by a pre-validate hook. Never set it by hand. */
   blocks: Date[];
 
+  /** The student's timezone when they booked (from their browser), for times in emails. */
+  studentTimeZone?: string;
+  /** When the reminder email went out, so it is sent once. */
+  reminderSentAt?: Date;
+
   cancelledBy?: Types.ObjectId;
   cancelledAt?: Date;
   cancelReason?: string;
@@ -133,6 +138,8 @@ const BookingSchema = new Schema<IBooking>(
     // split into their own collection.
     notes: { type: [BookingNoteSchema], default: [] },
     blocks: { type: [Date], default: undefined },
+    studentTimeZone: { type: String, maxlength: 64 },
+    reminderSentAt: { type: Date },
     rating: { type: BookingRatingSchema },
 
     cancelledBy: { type: Schema.Types.ObjectId, ref: 'User' },

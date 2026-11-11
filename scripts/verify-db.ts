@@ -52,6 +52,7 @@ import {
 } from '../lib/db/queries/mentorConsole';
 import { addDays, formatZonedDate } from '../lib/booking/timezone';
 import { rateSession } from '../lib/db/queries/feedback';
+import { notifyBooking, sendReminders } from '../lib/db/queries/notifications';
 import { feedbackSummary, listParticipants, listSessionsForAdmin } from '../lib/db/queries/adminInsights';
 import { addOpportunity, hideOpportunity, listOpportunities, refreshOpportunities } from '../lib/db/queries/opportunities';
 import { BRIDGE_SIZE, rankCandidates } from '../lib/matching/similarity';
@@ -1009,6 +1010,65 @@ async function main() {
       await removePhoto(uid, { config: fakeCloud, fetchImpl: fakeFetch });
       ok('removing deletes the file from Cloudinary', destroyed.includes(`pathora/mentors/${mid}`));
       ok('and the profile goes back to initials', !(await getMentor(mid))?.photo);
+    }
+
+    console.log('\n── Booking emails ─────────────────────────────────────────');
+    {
+      // A stand-in sender: records each email instead of sending it.
+      const outbox: { to: string; subject: string; text: string }[] = [];
+      const fakeSend = async (e: { to: string; subject: string; text: string }) => {
+        outbox.push(e);
+        return { sent: true };
+      };
+      const savedAppUrl = process.env.APP_URL;
+      process.env.APP_URL = 'https://pathora.test';
+      const mailStudent = await User.create({ name: `Nkem Okeke ${RUN}`, email: `nkem.${RUN}@pathora.test`, role: 'student' });
+      const at = (hours: number) => new Date(Date.now() + hours * 3_600_000);
+      try {
+        const b = await Booking.create({
+          student: mailStudent._id,
+          mentor: mentor._id,
+          topic: `Mail test ${RUN}`,
+          startsAt: at(10),
+          endsAt: at(10.75),
+          status: 'pending',
+          studentTimeZone: 'Africa/Nairobi',
+        });
+        await notifyBooking(String(b._id), 'requested', { send: fakeSend });
+        const request = outbox.at(-1);
+        ok('a booking request emails the mentor', request?.to === mentorUser.email && request.subject.includes('Nkem'));
+        ok("with the student's first name only", !!request && !request.text.includes('Okeke') && !request.text.includes(`nkem.${RUN}`));
+
+        await notifyBooking(String(b._id), 'confirmed', { send: fakeSend });
+        const confirmed = outbox.at(-1);
+        ok('a confirmation emails the student, in their own time, with the join link', confirmed?.to === `nkem.${RUN}@pathora.test` && confirmed.text.includes('Africa/Nairobi time') && confirmed.text.includes(`https://pathora.test/session/${b._id}`));
+
+        // Reminders: once per confirmed session in the next 24 hours.
+        b.status = 'confirmed';
+        await b.save();
+        const before = outbox.length;
+        const first = await sendReminders({ send: fakeSend });
+        ok('the daily run reminds both people', first.sessions >= 1 && outbox.slice(before).some((e) => e.to === mentorUser.email) && outbox.slice(before).some((e) => e.to === `nkem.${RUN}@pathora.test`));
+        const again = await sendReminders({ send: fakeSend });
+        ok('and only once', again.sessions === 0);
+
+        // A mail outage must not mark the reminder as sent.
+        const b2 = await Booking.create({ student: mailStudent._id, mentor: mentor._id, topic: `Mail test 2 ${RUN}`, startsAt: at(14), endsAt: at(14.75), status: 'confirmed' });
+        await sendReminders({ send: async () => ({ sent: false, reason: 'down' }) });
+        ok('a failed reminder is retried on the next run', !(await Booking.findById(b2._id).lean())?.reminderSentAt);
+
+        // Partner mentors' placeholder addresses never receive mail.
+        const results = await notifyBooking(String(b._id), 'confirmed', {
+          send: async () => {
+            throw new Error('should not be called for a placeholder');
+          },
+        }).catch(() => null);
+        ok('a mail error never throws out of the notifier', Array.isArray(results));
+      } finally {
+        await Booking.deleteMany({ student: mailStudent._id });
+        if (savedAppUrl === undefined) delete process.env.APP_URL;
+        else process.env.APP_URL = savedAppUrl;
+      }
     }
 
     console.log('\n── Opportunities ──────────────────────────────────────────');

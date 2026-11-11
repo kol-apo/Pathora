@@ -30,7 +30,8 @@ import { classifySector, classifyType, extractDeadline, parseRss, stripLeadingDe
 import { deadlineLabel } from '../lib/opportunities/format';
 import { buildPathyMessages, buildPathySystemPrompt, pathyFallbackReply, PATHY_HISTORY_TURNS, PATHY_MAX_MESSAGE_CHARS, type PathyContext } from '../lib/ai/pathy';
 import { Opportunity } from '../lib/db/models';
-import { textToHtml } from '../lib/email/send';
+import { emailProvider, parseSender, sendEmail, textToHtml } from '../lib/email/send';
+import { cancelledByStudentEmail, confirmedEmail, declinedEmail, newRequestEmail, reminderEmails, when } from '../lib/email/bookingEmails';
 import { appUrl } from '../lib/appUrl';
 import { PasswordSchema } from '../lib/auth/password';
 import { roomNameFor, roomProperties, sessionWindow, tokenProperties } from '../lib/video/daily';
@@ -1451,6 +1452,63 @@ async function photoTests() {
   ok("a partner photo or another account's is not", !isOurPhoto('/mentors/edafe.webp', config) && !isOurPhoto('https://res.cloudinary.com/other/image/upload/pathora/mentors/x', config));
 }
 
+async function emailTests() {
+  section('Email: Brevo sending and booking emails');
+  eq('a named sender is read', parseSender('Pathora <kola@gmail.com>'), { name: 'Pathora', email: 'kola@gmail.com' });
+  eq('a bare address gets the name Pathora', parseSender('kola@gmail.com'), { name: 'Pathora', email: 'kola@gmail.com' });
+  ok('a malformed sender is refused', parseSender('not an email') === null);
+  ok('Brevo is used when its key is set', emailProvider({ BREVO_API_KEY: 'x', RESEND_API_KEY: 'y' }) === 'brevo');
+  ok('Resend is the fallback', emailProvider({ RESEND_API_KEY: 'y' }) === 'resend');
+  ok('nothing is sent with neither', emailProvider({}) === null);
+
+  // What actually goes to Brevo, with the network replaced.
+  const saved = { key: process.env.BREVO_API_KEY, from: process.env.EMAIL_FROM };
+  process.env.BREVO_API_KEY = 'test-key';
+  process.env.EMAIL_FROM = 'Pathora <sender@example.com>';
+  let sentUrl = '';
+  let sentInit: RequestInit = {};
+  const fakeFetch = (async (url: string, init: RequestInit) => {
+    sentUrl = url;
+    sentInit = init;
+    return new Response('{"messageId":"m1"}', { status: 201 });
+  }) as unknown as typeof fetch;
+  const result = await sendEmail({ to: 'student@example.com', toName: 'Ada Obi', subject: 'Hi', text: 'Hello <there>' }, fakeFetch);
+  const payload = JSON.parse(String(sentInit.body));
+  ok('it is sent to Brevo\'s email API', result.sent && sentUrl === 'https://api.brevo.com/v3/smtp/email');
+  ok('with the key in the api-key header', (sentInit.headers as Record<string, string>)['api-key'] === 'test-key');
+  ok('from the verified sender, to the recipient by name', payload.sender.email === 'sender@example.com' && payload.to[0].email === 'student@example.com' && payload.to[0].name === 'Ada Obi');
+  ok('with a plain-text and a safe HTML version', payload.textContent === 'Hello <there>' && payload.htmlContent.includes('Hello &lt;there&gt;'));
+  const failed = await sendEmail({ to: 'a@b.co', subject: 'x', text: 'y' }, (async () => new Response('bad', { status: 400 })) as unknown as typeof fetch);
+  ok('a refusal is reported, not thrown', failed.sent === false && failed.reason === 'HTTP 400');
+  process.env.EMAIL_FROM = '';
+  ok('Brevo without a sender is refused before sending', (await sendEmail({ to: 'a@b.co', subject: 'x', text: 'y' }, fakeFetch)).sent === false);
+  process.env.BREVO_API_KEY = saved.key ?? '';
+  process.env.EMAIL_FROM = saved.from ?? '';
+  if (!saved.key) delete process.env.BREVO_API_KEY;
+  if (!saved.from) delete process.env.EMAIL_FROM;
+
+  const facts = {
+    bookingId: 'b123',
+    startsAt: new Date('2026-11-12T13:00:00Z'),
+    topic: 'Getting my first data job',
+    student: { name: 'Ada Obi', email: 'ada@example.com', timeZone: 'Africa/Nairobi' },
+    mentor: { name: 'Kemi Adebayo', email: 'kemi@example.com', timeZone: 'Africa/Lagos' },
+    appUrl: 'https://usepathora.vercel.app',
+  };
+  eq('times are written in the reader\'s own timezone', when(facts.startsAt, 'Africa/Lagos'), 'Thursday 12 November, 14:00 (Africa/Lagos time)');
+  ok('UTC when the student\'s timezone is unknown', when(facts.startsAt).endsWith('13:00 (UTC)'));
+  const request = newRequestEmail(facts);
+  ok('a new request goes to the mentor, in their time', request.to === 'kemi@example.com' && request.text.includes('14:00 (Africa/Lagos time)'));
+  ok('it names the student by first name only', request.subject.includes('Ada') && !request.text.includes('Obi') && !request.text.includes('ada@example.com'));
+  ok('it links to the mentor console and says the topic', request.text.includes('https://usepathora.vercel.app/mentor') && request.text.includes('Getting my first data job'));
+  const confirmed = confirmedEmail(facts);
+  ok('a confirmation goes to the student, in their time, with the join link', confirmed.to === 'ada@example.com' && confirmed.text.includes('16:00 (Africa/Nairobi time)') && confirmed.text.includes('/session/b123'));
+  ok('a decline points the student to other mentors', declinedEmail(facts).text.includes('/explore'));
+  ok('a cancellation tells the mentor the time is free', cancelledByStudentEmail(facts).to === 'kemi@example.com');
+  const reminders = reminderEmails(facts);
+  ok('a reminder goes to both people, each with the join link', reminders.length === 2 && reminders.every((r) => r.text.includes('/session/b123')) && reminders.map((r) => r.to).sort().join() === 'ada@example.com,kemi@example.com');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   await timezoneTests();
@@ -1467,6 +1525,7 @@ async function main() {
   await videoTests();
   await hourGridTests();
   await photoTests();
+  await emailTests();
 
   console.log(`\n${'═'.repeat(62)}`);
   console.log(failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${passed} passed, ${failed} FAILED`);

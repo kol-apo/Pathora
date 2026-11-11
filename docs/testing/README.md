@@ -18,8 +18,8 @@ Results measured on 31 October 2026. How to rerun each one is in the main [READM
 | Strategy | Tool | Result |
 | --- | --- | --- |
 | Static checks | `npx tsc --noEmit`, `npm run lint` (ESLint with the Next.js and TypeScript rules) | No type errors; no lint warnings or errors across app, components, lib, scripts and tests |
-| Unit | `npm run verify` | 311 of 311 checks pass |
-| Integration (real database) | `npm run verify:db` / `npm run verify:db:local` | 136 of 136 checks pass |
+| Unit | `npm run verify` | 332 of 332 checks pass |
+| Integration (real database) | `npm run verify:db` / `npm run verify:db:local` | 143 of 143 checks pass |
 | Concurrency | within `verify:db` | 5 simultaneous bookings of one slot: exactly 1 succeeds. 4 simultaneous bookings at overlapping times 15 minutes apart: exactly 1 succeeds; the database refuses an overlap even when the app's own check is skipped |
 | End-to-end and cross-browser | `npm run test:e2e` (Playwright) | 15 of 15 journeys pass in each of Chrome, Edge, Firefox and an Android phone: 60 of 60 |
 | Responsive layout | within `test:e2e` | No page scrolls sideways on any public, student, mentor or admin page, at desktop and phone sizes |
