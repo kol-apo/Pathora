@@ -52,6 +52,7 @@ import {
   type AvailabilityRules,
 } from '../lib/booking/slots';
 import { blocksFor } from '../lib/db/models/Booking';
+import { cloudinaryConfig, isOurPhoto, photoPublicId, photoUrl, signParams, uploadSignature } from '../lib/media/cloudinary';
 import {
   ENVIRONMENT_OPTIONS,
   INTEREST_OPTIONS,
@@ -1424,6 +1425,32 @@ async function hourGridTests() {
   ok('an odd start rounds outward, so the check only gets stricter', odd.join(',') === '08:00,08:15,08:30,08:45,09:00', odd.join(','));
 }
 
+
+async function photoTests() {
+  section('Mentor photos (Cloudinary signing)');
+  // Cloudinary's own worked example from its signature documentation.
+  eq(
+    "the signature matches Cloudinary's documented example",
+    signParams({ eager: 'w_400,h_300,c_pad|w_260,h_200,c_crop', public_id: 'sample_image', timestamp: 1315060510 }, 'abcd'),
+    'bfd09f95f331f558cbd1320e67aa8d488770583e',
+  );
+  eq('parameter order does not change the signature', signParams({ b: 2, a: 1 }, 's'), signParams({ a: 1, b: 2 }, 's'));
+  ok('photo uploads are off until all three settings are set', cloudinaryConfig({ CLOUDINARY_CLOUD_NAME: 'x', CLOUDINARY_API_KEY: 'y' }) === null);
+
+  const config = { cloudName: 'demo-cloud', apiKey: '123', apiSecret: 'shh' };
+  const signed = uploadSignature('abc123', config, new Date('2026-11-11T10:00:00Z'));
+  ok('each mentor uploads to their own file', signed.params.public_id === 'pathora/mentors/abc123' && photoPublicId('abc123') === signed.params.public_id);
+  ok('only photo formats are accepted', signed.params.allowed_formats === 'jpg,jpeg,png,webp,heic');
+  ok('the signature covers every parameter sent', signed.signature === signParams(signed.params, 'shh'));
+  ok('the secret is never sent to the browser', !JSON.stringify(signed).includes('shh'));
+
+  const url = photoUrl(config, 'abc123', 1762855200);
+  eq('the stored address is a face-cropped 400 px square', url, 'https://res.cloudinary.com/demo-cloud/image/upload/c_fill,g_face,w_400,h_400,f_auto,q_auto/v1762855200/pathora/mentors/abc123');
+  ok("it passes the mentor profile's photo rule", /^(\/mentors\/[a-z0-9-]+\.(webp|png|jpe?g)|https:\/\/\S+)$/.test(url));
+  ok('our photos are recognised for deletion', isOurPhoto(url, config));
+  ok("a partner photo or another account's is not", !isOurPhoto('/mentors/edafe.webp', config) && !isOurPhoto('https://res.cloudinary.com/other/image/upload/pathora/mentors/x', config));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   await timezoneTests();
@@ -1439,6 +1466,7 @@ async function main() {
   await accountRecoveryTests();
   await videoTests();
   await hourGridTests();
+  await photoTests();
 
   console.log(`\n${'═'.repeat(62)}`);
   console.log(failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${passed} passed, ${failed} FAILED`);

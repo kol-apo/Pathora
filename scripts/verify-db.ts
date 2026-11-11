@@ -36,14 +36,18 @@ import bcrypt from 'bcryptjs';
 import { previewBridge, saveDiscoveryResult } from '../lib/db/queries/discovery';
 import { generateDiscovery } from '../lib/ai/discovery';
 import { studentVectorFor } from '../lib/discovery/questions';
-import { listAvailableSlots } from '../lib/db/queries/mentors';
+import { getMentor, listAvailableSlots } from '../lib/db/queries/mentors';
 import { bridgeEligible, surfaceBridgeConsultants } from '../lib/db/queries/bridge';
 import { getDiscoveryResultForMentor, getDiscoveryResultForStudent } from '../lib/db/queries/access';
 import { bridgeFunnel, countStudentEvents, logEvent, logStudentEvent, sessionCompletion } from '../lib/db/queries/research';
 import {
+  getMentorSelf,
   getMyAvailability,
   listMyPastSessions,
+  removePhoto,
   respondToBooking,
+  savePhoto,
+  startPhotoUpload,
   updateMyAvailability,
 } from '../lib/db/queries/mentorConsole';
 import { addDays, formatZonedDate } from '../lib/booking/timezone';
@@ -960,6 +964,51 @@ async function main() {
         await Booking.deleteMany({ student: rater._id });
         await StudentProfile.deleteMany({ user: rater._id });
       }
+    }
+
+    console.log('\n── Mentor photos ──────────────────────────────────────────');
+    {
+      // A stand-in Cloudinary account and network: nothing is uploaded or deleted for real.
+      const fakeCloud = { cloudName: 'test-cloud', apiKey: 'k', apiSecret: 's' };
+      const destroyed: string[] = [];
+      const fakeFetch = (async (_url: string, init?: RequestInit) => {
+        destroyed.push(String(new URLSearchParams(String(init?.body)).get('public_id')));
+        return new Response('{"result":"ok"}', { status: 200 });
+      }) as unknown as typeof fetch;
+      const refusedWith = async (code: string, fn: () => Promise<unknown>) => {
+        try {
+          await fn();
+          return false;
+        } catch (err) {
+          return err instanceof DataError && err.code === code;
+        }
+      };
+      const uid = String(mentorUser._id);
+      const mid = String(mentor._id);
+
+      ok(
+        'uploads are refused clearly while Cloudinary is not set up',
+        await refusedWith('PHOTO_UNAVAILABLE', () => startPhotoUpload(uid, { config: null })),
+      );
+      const signed = await startPhotoUpload(uid, { config: fakeCloud });
+      ok("the upload permission names the mentor's own file", signed.params.public_id === `pathora/mentors/${mid}`);
+      ok(
+        'a student cannot get an upload permission',
+        await refusedWith('NOT_A_MENTOR', () => startPhotoUpload(String(students[0]._id), { config: fakeCloud })),
+      );
+      ok(
+        'a made-up version number is refused',
+        await refusedWith('INVALID_PHOTO', () => savePhoto(uid, 'https://evil.example/x.png', { config: fakeCloud })),
+      );
+
+      const url = await savePhoto(uid, 1762855200, { config: fakeCloud });
+      ok('the photo address is built by the server, for this mentor only', url === `https://res.cloudinary.com/test-cloud/image/upload/c_fill,g_face,w_400,h_400,f_auto,q_auto/v1762855200/pathora/mentors/${mid}`);
+      ok('students see it on the mentor profile', (await getMentor(mid))?.photo === url);
+      ok('the mentor sees it in their console', (await getMentorSelf(uid))?.photo === url);
+
+      await removePhoto(uid, { config: fakeCloud, fetchImpl: fakeFetch });
+      ok('removing deletes the file from Cloudinary', destroyed.includes(`pathora/mentors/${mid}`));
+      ok('and the profile goes back to initials', !(await getMentor(mid))?.photo);
     }
 
     console.log('\n── Opportunities ──────────────────────────────────────────');

@@ -9,6 +9,14 @@ import { initialsFor } from './accounts';
 import { setBookingStatus } from './bookings';
 import { listAvailableSlots } from './mentors';
 import { refreshMentorRating } from './feedback';
+import {
+  cloudinaryConfig,
+  destroyPhoto,
+  isOurPhoto,
+  photoUrl,
+  uploadSignature,
+  type CloudinaryConfig,
+} from '@/lib/media/cloudinary';
 import { DataError } from './errors';
 import type { MentorLink, MentorSocials } from '@/lib/profileLinks';
 
@@ -86,6 +94,8 @@ export interface MentorSelf {
   status: MentorStatus;
   acceptingBookings: boolean;
   timezone: string;
+  /** Their headshot's address, if they have one. */
+  photo: string | null;
 }
 
 export async function getMentorSelf(userId: string): Promise<MentorSelf | null> {
@@ -101,6 +111,7 @@ export async function getMentorSelf(userId: string): Promise<MentorSelf | null> 
     status: m.status ?? (m.vetted ? 'approved' : 'pending_review'),
     acceptingBookings: m.acceptingBookings !== false,
     timezone: m.timezone,
+    photo: m.photo ?? null,
   };
 }
 
@@ -418,5 +429,58 @@ export async function updateMyLinks(
   if (!m) throw new DataError('NOT_A_MENTOR', 'No mentor profile for this account.');
   m.socials = value.socials;
   m.links = value.links;
+  await m.save();
+}
+
+// ── Headshot ──────────────────────────────────────────────────────────────────
+
+/** Options for tests: a stand-in Cloudinary account and network. */
+interface PhotoDeps {
+  config?: CloudinaryConfig | null;
+  fetchImpl?: typeof fetch;
+}
+
+function requireCloudinary(deps: PhotoDeps): CloudinaryConfig {
+  const config = deps.config === undefined ? cloudinaryConfig() : deps.config;
+  if (!config) throw new DataError('PHOTO_UNAVAILABLE', 'Photo uploads are not set up yet.');
+  return config;
+}
+
+async function requireMentor(userId: string) {
+  await dbConnect();
+  const m = await MentorProfile.findOne({ user: userId });
+  if (!m) throw new DataError('NOT_A_MENTOR', 'No mentor profile for this account.');
+  return m;
+}
+
+/** A signed, one-hour permission for the browser to upload this mentor's photo to Cloudinary. */
+export async function startPhotoUpload(userId: string, deps: PhotoDeps = {}) {
+  const config = requireCloudinary(deps);
+  const m = await requireMentor(userId);
+  return uploadSignature(String(m._id), config);
+}
+
+/**
+ * Record the photo just uploaded. Only Cloudinary's version number comes from
+ * the browser; the address is built here, so it can only ever point at this
+ * mentor's own file in this account.
+ */
+export async function savePhoto(userId: string, version: unknown, deps: PhotoDeps = {}): Promise<string> {
+  const config = requireCloudinary(deps);
+  if (typeof version !== 'number' || !Number.isInteger(version) || version <= 0 || version > 1e12) {
+    throw new DataError('INVALID_PHOTO', 'That upload could not be confirmed. Please try again.');
+  }
+  const m = await requireMentor(userId);
+  m.photo = photoUrl(config, String(m._id), version);
+  await m.save();
+  return m.photo;
+}
+
+/** Remove the mentor's photo: deleted from Cloudinary, and initials shown instead. */
+export async function removePhoto(userId: string, deps: PhotoDeps = {}): Promise<void> {
+  const m = await requireMentor(userId);
+  const config = deps.config === undefined ? cloudinaryConfig() : deps.config;
+  if (config && isOurPhoto(m.photo, config)) await destroyPhoto(String(m._id), config, deps.fetchImpl);
+  m.photo = undefined;
   await m.save();
 }

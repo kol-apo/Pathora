@@ -44,7 +44,7 @@ const NAV: Record<SidebarVariant, NavItem[]> = {
   mentor: [
     { label: 'Sessions', href: '/mentor', icon: CalendarDays, exact: true },
     { label: 'Availability', href: '/mentor/availability', icon: Clock },
-    { label: 'Profile links', href: '/mentor/profile', icon: Link2 },
+    { label: 'Profile', href: '/mentor/profile', icon: Link2 },
   ],
   admin: [
     { label: 'Overview', href: '/admin', icon: BarChart3, exact: true },

@@ -13,6 +13,7 @@ import {
   VideoSession,
 } from '../models';
 import { refreshMentorRating } from './feedback';
+import { cloudinaryConfig, destroyPhoto, isOurPhoto } from '@/lib/media/cloudinary';
 import { DataError } from './errors';
 
 /**
@@ -64,8 +65,11 @@ export async function deleteAccount(userId: string, password: string | null): Pr
   await StudentProfile.deleteMany({ user: userId });
 
   // As a mentor: their sessions, their places in students' matches, their hours, profile.
-  const mentor = await MentorProfile.findOne({ user: userId }).select('_id').lean();
+  const mentor = await MentorProfile.findOne({ user: userId }).select('_id photo').lean();
   if (mentor) {
+    // Their headshot goes too. Best effort: a Cloudinary outage must not block withdrawal.
+    const cloudinary = cloudinaryConfig();
+    if (cloudinary && isOurPhoto(mentor.photo, cloudinary)) await destroyPhoto(String(mentor._id), cloudinary);
     const mentorBookings = await Booking.find({ mentor: mentor._id }).select('_id').lean();
     await VideoSession.deleteMany({ booking: { $in: mentorBookings.map((b) => b._id) } });
     report.bookings += (await Booking.deleteMany({ mentor: mentor._id })).deletedCount;
