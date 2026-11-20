@@ -54,6 +54,7 @@ import {
 } from '../lib/booking/slots';
 import { blocksFor } from '../lib/db/models/Booking';
 import { PRIVACY_SECTIONS } from '../lib/research/privacy';
+import { CONSENT_AGREEMENT, CONSENT_POINTS } from '../lib/research/consent';
 import { cloudinaryConfig, isOurPhoto, photoPublicId, photoUrl, signParams, uploadSignature } from '../lib/media/cloudinary';
 import {
   ENVIRONMENT_OPTIONS,
@@ -1522,6 +1523,11 @@ async function privacyTests() {
   ok('it says Pathy chats are not stored by Pathora', /conversations with Pathy are not stored/i.test(text));
   ok('it explains how to withdraw', /withdraw/i.test(text) && /Account page/.test(text));
   ok('it discloses the Gemini free-tier terms', /Google may use this content/.test(text));
+  ok('it states the minimum age (15, or with a guardian or supervisor)', /15 or older/.test(text) && /guardian or supervisor/.test(text));
+  ok(
+    'the consent and its checkbox both state the minimum age',
+    CONSENT_POINTS.some((p) => /15 or older/.test(p) && /guardian/.test(p)) && /15 or older/.test(CONSENT_AGREEMENT),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

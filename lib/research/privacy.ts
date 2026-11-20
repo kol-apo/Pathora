@@ -28,7 +28,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
     id: 'who',
     title: 'Who runs Pathora',
     intro:
-      'Pathora is a career-readiness platform for African university students, and the research instrument for a capstone study at African Leadership University (ALU). It is run by the researcher leading that study. "We" on this page means the Pathora study team.',
+      'Pathora is a career-readiness platform for African university students, and the research instrument for a capstone study at African Leadership University (ALU). It is run by the researcher leading that study. "We" on this page means the Pathora study team. Pathora is for people aged 15 or older; anyone younger may use it only with a parent, guardian or supervisor present who agrees.',
   },
   {
     id: 'collect',
