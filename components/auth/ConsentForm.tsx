@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, Check, Loader2 } from 'lucide-react';
@@ -60,6 +61,13 @@ export default function ConsentForm({
             </li>
           ))}
         </ul>
+        <p className="mt-4 text-[13px] text-muted">
+          Full details of what is collected, who processes it and how long it is kept:{' '}
+          <Link href="/privacy" target="_blank" className="font-medium text-navy underline underline-offset-2">
+            privacy policy
+          </Link>
+          .
+        </p>
       </div>
 
       {error && (

@@ -8,7 +8,7 @@ import { createMentor, createStudent, db, expect, PASSWORD, scrollsSideways, sig
  */
 
 const PAGES = {
-  public: ['/', '/signin', '/signup', '/become-a-mentor'],
+  public: ['/', '/signin', '/signup', '/become-a-mentor', '/privacy'],
   student: ['/dashboard', '/explore', '/discover', '/opportunities', '/sessions', '/account'],
   mentor: ['/mentor', '/mentor/availability', '/mentor/profile'],
   admin: ['/admin', '/admin/mentors', '/admin/sessions', '/admin/feedback', '/admin/students', '/admin/opportunities'],

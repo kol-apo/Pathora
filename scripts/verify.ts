@@ -53,6 +53,7 @@ import {
   type AvailabilityRules,
 } from '../lib/booking/slots';
 import { blocksFor } from '../lib/db/models/Booking';
+import { PRIVACY_SECTIONS } from '../lib/research/privacy';
 import { cloudinaryConfig, isOurPhoto, photoPublicId, photoUrl, signParams, uploadSignature } from '../lib/media/cloudinary';
 import {
   ENVIRONMENT_OPTIONS,
@@ -1509,6 +1510,20 @@ async function emailTests() {
   ok('a reminder goes to both people, each with the join link', reminders.length === 2 && reminders.every((r) => r.text.includes('/session/b123')) && reminders.map((r) => r.to).sort().join() === 'ada@example.com,kemi@example.com');
 }
 
+
+async function privacyTests() {
+  section('Privacy page');
+  const processors = PRIVACY_SECTIONS.find((x) => x.id === 'processors')?.table?.rows.map((r) => r[0]) ?? [];
+  for (const service of ['MongoDB Atlas', 'Vercel', 'Google Gemini', 'Daily.co', 'Brevo', 'Cloudinary']) {
+    ok(`the privacy page names ${service}, which Pathora uses`, processors.includes(service));
+  }
+  const text = JSON.stringify(PRIVACY_SECTIONS);
+  ok('it says calls are never recorded', /never recorded/.test(text));
+  ok('it says Pathy chats are not stored by Pathora', /conversations with Pathy are not stored/i.test(text));
+  ok('it explains how to withdraw', /withdraw/i.test(text) && /Account page/.test(text));
+  ok('it discloses the Gemini free-tier terms', /Google may use this content/.test(text));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 async function main() {
   await timezoneTests();
@@ -1526,6 +1541,7 @@ async function main() {
   await hourGridTests();
   await photoTests();
   await emailTests();
+  await privacyTests();
 
   console.log(`\n${'═'.repeat(62)}`);
   console.log(failed === 0 ? `ALL ${passed} CHECKS PASSED` : `${passed} passed, ${failed} FAILED`);

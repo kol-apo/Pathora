@@ -7,7 +7,8 @@ const links = [
   { label: 'About', href: '/#about' },
   { label: 'For mentors', href: '/become-a-mentor' },
   { label: 'Opportunities', href: '/dashboard#opportunities' },
-  { label: 'Contact', href: '#' },
+  { label: 'Privacy', href: '/privacy' },
+  { label: 'Contact', href: '/privacy#contact' },
 ];
 
 const partners = Object.values(PARTNERS);

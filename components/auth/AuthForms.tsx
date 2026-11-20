@@ -290,6 +290,13 @@ export function SignUpForm({ googleEnabled, next }: { googleEnabled: boolean; ne
         <div className="pt-2">
           <SubmitButton busy={busy}>Create account</SubmitButton>
         </div>
+        <p className="text-center text-[12.5px] text-muted">
+          See how we use your information in our{' '}
+          <Link href="/privacy" target="_blank" className="font-medium text-navy underline underline-offset-2">
+            privacy policy
+          </Link>
+          .
+        </p>
       </form>
     </>
   );
